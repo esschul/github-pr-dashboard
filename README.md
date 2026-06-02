@@ -31,6 +31,12 @@ npm start
 
 The GitHub CLI login is the only runtime credential required.
 
+## Download
+
+Download the macOS DMG from the repository Releases page. The app is distributed
+for internal use without Apple notarization, so macOS may require confirming the
+first launch in System Settings under Privacy & Security.
+
 ## Team configuration
 
 The dashboard finds repositories by GitHub organization and repository topic.
