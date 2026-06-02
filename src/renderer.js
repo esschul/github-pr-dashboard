@@ -1,0 +1,280 @@
+const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
+const STORAGE_KEYS = {
+    config: 'github-pr-dashboard:config',
+    seenPullRequests: 'github-pr-dashboard:seen-pull-requests',
+    theme: 'github-pr-dashboard:theme'
+};
+const DEFAULT_CONFIG = {
+    organization: 'bring',
+    topic: 'checkout'
+};
+
+const navItems = Array.from(document.querySelectorAll('.nav-item[data-view]'));
+const teamLabel = document.getElementById('teamLabel');
+const viewEyebrow = document.getElementById('viewEyebrow');
+const viewTitle = document.getElementById('viewTitle');
+const refreshButton = document.getElementById('refreshButton');
+const themeButton = document.getElementById('themeButton');
+const themeIcon = document.getElementById('themeIcon');
+const statusPanel = document.getElementById('statusPanel');
+const errorPanel = document.getElementById('errorPanel');
+const pullRequestsView = document.getElementById('pullRequestsView');
+const dependabotView = document.getElementById('dependabotView');
+const settingsView = document.getElementById('settingsView');
+const pullRequestsList = document.getElementById('pullRequestsList');
+const dependabotList = document.getElementById('dependabotList');
+const pullRequestsCount = document.getElementById('pullRequestsCount');
+const dependabotCount = document.getElementById('dependabotCount');
+const settingsForm = document.getElementById('settingsForm');
+const organizationInput = document.getElementById('organizationInput');
+const topicInput = document.getElementById('topicInput');
+
+let activeView = 'pull-requests';
+let refreshInProgress = false;
+
+function readStoredJson(key, fallback) {
+    try {
+        return JSON.parse(window.localStorage.getItem(key)) || fallback;
+    } catch (_error) {
+        return fallback;
+    }
+}
+
+function getConfig() {
+    return readStoredJson(STORAGE_KEYS.config, DEFAULT_CONFIG);
+}
+
+function saveConfig(config) {
+    window.localStorage.setItem(STORAGE_KEYS.config, JSON.stringify(config));
+}
+
+function getTeamKey(config) {
+    return `${config.organization}/${config.topic}`;
+}
+
+function getSeenPullRequestState(config) {
+    const states = readStoredJson(STORAGE_KEYS.seenPullRequests, {});
+    return states[getTeamKey(config)] || {
+        initialized: false,
+        urls: []
+    };
+}
+
+function saveSeenPullRequestState(config, state) {
+    const states = readStoredJson(STORAGE_KEYS.seenPullRequests, {});
+    states[getTeamKey(config)] = state;
+    window.localStorage.setItem(STORAGE_KEYS.seenPullRequests, JSON.stringify(states));
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function escapeAttribute(value) {
+    return escapeHtml(value);
+}
+
+function formatDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+        ? ''
+        : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function getReviewLabel(pullRequest) {
+    if (pullRequest.isDraft) return 'Draft';
+    return {
+        APPROVED: 'Approved',
+        CHANGES_REQUESTED: 'Changes requested',
+        REVIEW_REQUIRED: 'Review required'
+    }[pullRequest.reviewDecision] || 'Open';
+}
+
+function getAgeDetails(createdAt) {
+    const createdDate = new Date(createdAt);
+    if (Number.isNaN(createdDate.getTime())) {
+        return null;
+    }
+
+    const ageInDays = Math.max(0, Math.floor((Date.now() - createdDate.getTime()) / (24 * 60 * 60 * 1000)));
+    const level = ageInDays >= 30
+        ? 'critical'
+        : ageInDays >= 14
+            ? 'warning'
+            : ageInDays >= 7
+                ? 'notice'
+                : 'fresh';
+
+    return {
+        ageInDays,
+        label: ageInDays === 0 ? 'Opened today' : `${ageInDays} day${ageInDays === 1 ? '' : 's'} old`,
+        level
+    };
+}
+
+function renderPullRequestList(element, pullRequests, emptyMessage, options = {}) {
+    if (!pullRequests.length) {
+        element.innerHTML = `<section class="panel empty-state">${escapeHtml(emptyMessage)}</section>`;
+        return;
+    }
+
+    element.innerHTML = pullRequests.map((pullRequest) => {
+        const ageDetails = options.showAge ? getAgeDetails(pullRequest.createdAt) : null;
+        return `
+        <article class="pull-request-card">
+            <div>
+                <p class="eyebrow">${escapeHtml(pullRequest.repository)}</p>
+                <h3>${escapeHtml(pullRequest.title)}</h3>
+                <p class="pull-request-meta">
+                    <span>#${escapeHtml(pullRequest.number)}</span>
+                    <span>·</span>
+                    <span>${escapeHtml(pullRequest.author?.login || 'Unknown author')}</span>
+                    <span>·</span>
+                    <span>Updated ${escapeHtml(formatDate(pullRequest.updatedAt))}</span>
+                </p>
+            </div>
+            <div class="pull-request-actions">
+                ${ageDetails ? `<span class="age-pill is-${ageDetails.level}">${escapeHtml(ageDetails.label)}</span>` : ''}
+                <span class="pill">${escapeHtml(getReviewLabel(pullRequest))}</span>
+                <button class="secondary-button" type="button" data-pull-request-url="${escapeAttribute(pullRequest.url)}">Open</button>
+            </div>
+        </article>
+    `;
+    }).join('');
+}
+
+function renderResult(result) {
+    renderPullRequestList(pullRequestsList, result.pullRequests, 'No human-authored pull requests are open.');
+    renderPullRequestList(dependabotList, result.dependabotPullRequests, 'No Dependabot pull requests are open.', { showAge: true });
+    pullRequestsCount.textContent = result.pullRequests.length;
+    dependabotCount.textContent = result.dependabotPullRequests.length;
+    teamLabel.textContent = `${result.config.organization} / ${result.config.topic}`;
+    statusPanel.textContent = `${result.repositories.length} repositories · Updated ${formatDate(result.refreshedAt)}`;
+}
+
+async function notifyAboutNewPullRequests(config, pullRequests) {
+    const seenState = getSeenPullRequestState(config);
+    const seenUrls = new Set(seenState.urls);
+    const currentUrls = new Set(pullRequests.map((pullRequest) => pullRequest.url));
+
+    if (!seenState.initialized) {
+        saveSeenPullRequestState(config, {
+            initialized: true,
+            urls: Array.from(currentUrls)
+        });
+        return;
+    }
+
+    const newPullRequests = pullRequests.filter((pullRequest) => !seenUrls.has(pullRequest.url));
+    newPullRequests.forEach((pullRequest) => seenUrls.add(pullRequest.url));
+
+    // Keep the persisted set bounded while retaining all currently open PRs.
+    const retainedUrls = Array.from(new Set([
+        ...currentUrls,
+        ...Array.from(seenUrls).slice(-500)
+    ]));
+    saveSeenPullRequestState(config, {
+        initialized: true,
+        urls: retainedUrls
+    });
+
+    await Promise.all(newPullRequests.map((pullRequest) => window.githubDashboard.showNotification({
+        title: `New PR in ${pullRequest.repository}`,
+        body: `#${pullRequest.number} ${pullRequest.title}`,
+        url: pullRequest.url
+    })));
+}
+
+async function refresh() {
+    if (refreshInProgress) return;
+
+    refreshInProgress = true;
+    refreshButton.disabled = true;
+    statusPanel.textContent = 'Refreshing pull requests...';
+    errorPanel.classList.add('hidden');
+    errorPanel.innerHTML = '';
+
+    try {
+        const result = await window.githubDashboard.fetchPullRequests(getConfig());
+        renderResult(result);
+        await notifyAboutNewPullRequests(result.config, result.pullRequests);
+    } catch (error) {
+        statusPanel.textContent = 'Refresh failed.';
+        errorPanel.classList.remove('hidden');
+        errorPanel.innerHTML = `
+            <strong>${escapeHtml(error.message || 'GitHub CLI request failed.')}</strong>
+            ${error.details ? `<pre>${escapeHtml(error.details)}</pre>` : ''}
+        `;
+    } finally {
+        refreshInProgress = false;
+        refreshButton.disabled = false;
+    }
+}
+
+function setView(view) {
+    activeView = view;
+    pullRequestsView.classList.toggle('hidden', view !== 'pull-requests');
+    dependabotView.classList.toggle('hidden', view !== 'dependabot');
+    settingsView.classList.toggle('hidden', view !== 'settings');
+    refreshButton.classList.toggle('hidden', view === 'settings');
+    navItems.forEach((item) => item.classList.toggle('is-active', item.dataset.view === view));
+
+    const labels = {
+        'pull-requests': ['Team queue', 'Pull requests'],
+        dependabot: ['Dependency updates', 'Dependabot'],
+        settings: ['Dashboard', 'Settings']
+    };
+    [viewEyebrow.textContent, viewTitle.textContent] = labels[view];
+}
+
+function applyTheme(theme) {
+    const normalized = theme === 'dark' ? 'dark' : 'light';
+    const nextThemeLabel = normalized === 'dark' ? 'Use light theme' : 'Use dark theme';
+    document.documentElement.dataset.theme = normalized;
+    window.localStorage.setItem(STORAGE_KEYS.theme, normalized);
+    themeIcon.textContent = normalized === 'dark' ? '☀' : '☾';
+    themeButton.setAttribute('aria-label', nextThemeLabel);
+    themeButton.title = nextThemeLabel;
+}
+
+navItems.forEach((item) => {
+    item.addEventListener('click', () => setView(item.dataset.view));
+});
+
+refreshButton.addEventListener('click', refresh);
+themeButton.addEventListener('click', () => {
+    applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+});
+
+settingsForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const config = {
+        organization: organizationInput.value.trim(),
+        topic: topicInput.value.trim()
+    };
+    saveConfig(config);
+    teamLabel.textContent = `${config.organization} / ${config.topic}`;
+    setView('pull-requests');
+    refresh();
+});
+
+document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-pull-request-url]');
+    if (button) {
+        await window.githubDashboard.openExternal(button.dataset.pullRequestUrl);
+    }
+});
+
+const initialConfig = getConfig();
+organizationInput.value = initialConfig.organization;
+topicInput.value = initialConfig.topic;
+teamLabel.textContent = `${initialConfig.organization} / ${initialConfig.topic}`;
+applyTheme(window.localStorage.getItem(STORAGE_KEYS.theme));
+setView(activeView);
+refresh();
+window.setInterval(refresh, REFRESH_INTERVAL_MS);

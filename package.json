@@ -1,0 +1,15 @@
+{
+  "name": "github-pr-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Electron dashboard for team pull requests using the GitHub CLI",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "check": "node --check src/github-client.js && node --check src/main.js && node --check src/preload.js && node --check src/renderer.js"
+  },
+  "devDependencies": {
+    "electron": "^42.3.1"
+  }
+}

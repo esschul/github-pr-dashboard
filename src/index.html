@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub PR Dashboard</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div>
+                <p class="eyebrow">GitHub CLI</p>
+                <h1>PR Dashboard</h1>
+                <p id="teamLabel" class="team-label"></p>
+            </div>
+
+            <nav class="nav" aria-label="Dashboard views">
+                <button class="nav-item is-active" type="button" data-view="pull-requests">
+                    Pull requests
+                    <span id="pullRequestsCount" class="nav-count">0</span>
+                </button>
+                <button class="nav-item" type="button" data-view="dependabot">
+                    Dependabot
+                    <span id="dependabotCount" class="nav-count">0</span>
+                </button>
+                <button class="nav-item" type="button" data-view="settings">Settings</button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="themeButton" class="theme-button" type="button" aria-label="Use dark theme" title="Use dark theme">
+                    <span id="themeIcon" aria-hidden="true">☾</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="content">
+            <header class="topbar">
+                <div>
+                    <p id="viewEyebrow" class="eyebrow">Team queue</p>
+                    <h2 id="viewTitle">Pull requests</h2>
+                </div>
+                <button id="refreshButton" class="primary-button" type="button">Refresh</button>
+            </header>
+
+            <section id="statusPanel" class="status-panel" aria-live="polite">
+                Loading pull requests...
+            </section>
+
+            <section id="errorPanel" class="error-panel hidden" aria-live="polite"></section>
+
+            <section id="pullRequestsView" class="view">
+                <div id="pullRequestsList" class="pull-request-list"></div>
+            </section>
+
+            <section id="dependabotView" class="view hidden">
+                <div id="dependabotList" class="pull-request-list"></div>
+            </section>
+
+            <section id="settingsView" class="view hidden">
+                <form id="settingsForm" class="panel settings-form">
+                    <div>
+                        <p class="eyebrow">Team repositories</p>
+                        <h3>Configuration</h3>
+                        <p class="form-help">Repositories are selected by organization and GitHub repository topic.</p>
+                    </div>
+
+                    <label>
+                        <span>GitHub organization</span>
+                        <input id="organizationInput" name="organization" type="text" required autocomplete="off">
+                    </label>
+
+                    <label>
+                        <span>Repository topic</span>
+                        <input id="topicInput" name="topic" type="text" required autocomplete="off">
+                    </label>
+
+                    <div class="settings-actions">
+                        <button class="primary-button" type="submit">Save and refresh</button>
+                    </div>
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <script src="./renderer.js"></script>
+</body>
+</html>
