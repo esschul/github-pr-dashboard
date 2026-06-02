@@ -186,6 +186,7 @@ async function notifyAboutNewPullRequests(config, pullRequests) {
     await Promise.all(newPullRequests.map((pullRequest) => window.githubDashboard.showNotification({
         title: `New PR in ${pullRequest.repository}`,
         body: `#${pullRequest.number} ${pullRequest.title}`,
+        authorLogin: pullRequest.author?.login,
         url: pullRequest.url
     })));
 }

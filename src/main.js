@@ -1,6 +1,7 @@
 const path = require('node:path');
 const { app, BrowserWindow, ipcMain, Notification, shell } = require('electron');
 const { fetchPullRequests } = require('./github-client');
+const { isNotificationEligible } = require('./notification-policy');
 
 function createWindow() {
     const window = new BrowserWindow({
@@ -52,6 +53,9 @@ app.whenReady().then(() => {
 
     ipcMain.handle('notification:show', async (_event, payload) => {
         if (!Notification.isSupported()) {
+            return false;
+        }
+        if (!isNotificationEligible(payload)) {
             return false;
         }
         if (!isGithubUrl(payload?.url)) {
