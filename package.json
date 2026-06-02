@@ -6,6 +6,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "test:notification": "electron . --test-notification",
     "test": "node --test",
     "check": "node --check src/github-client.js && node --check src/notification-policy.js && node --check src/main.js && node --check src/preload.js && node --check src/renderer.js",
     "build:icon": "bash scripts/build-mac-icon.sh",

@@ -52,3 +52,7 @@ The first successful refresh establishes a baseline for the selected team.
 After that, newly observed human-authored pull requests produce a native system
 notification. Clicking the notification opens the pull request on GitHub.
 Dependabot pull requests do not produce notifications.
+
+On macOS, notifications are sent through AppleScript so unsigned internal builds
+can display them reliably. macOS attributes these notifications to the script
+host, and clicking them does not open the pull request.
