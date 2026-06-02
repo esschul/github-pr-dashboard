@@ -4,6 +4,7 @@ const { fetchPullRequests } = require('./github-client');
 const { isNotificationEligible } = require('./notification-policy');
 
 function createWindow() {
+    const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
     const window = new BrowserWindow({
         width: 1180,
         height: 820,
@@ -11,6 +12,7 @@ function createWindow() {
         minHeight: 620,
         backgroundColor: '#f6f7fb',
         title: 'GitHub PR Dashboard',
+        icon: iconPath,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -26,6 +28,11 @@ function isGithubUrl(url) {
 }
 
 app.whenReady().then(() => {
+    const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
+    if (process.platform === 'darwin' && app.dock) {
+        app.dock.setIcon(iconPath);
+    }
+
     ipcMain.handle('pull-requests:fetch', async (_event, config) => {
         try {
             return {

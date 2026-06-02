@@ -8,6 +8,7 @@
     "start": "electron .",
     "test": "node --test",
     "check": "node --check src/github-client.js && node --check src/notification-policy.js && node --check src/main.js && node --check src/preload.js && node --check src/renderer.js",
+    "build:icon": "bash scripts/build-mac-icon.sh",
     "build:mac": "electron-builder --mac dmg"
   },
   "devDependencies": {
@@ -19,10 +20,12 @@
     "productName": "GitHub PR Dashboard",
     "files": [
       "src/**/*",
+      "assets/icon.png",
       "package.json"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.icns",
       "target": [
         "dmg"
       ]
