@@ -4,15 +4,15 @@ const { fetchPullRequests, getLatestCommentActivity, getLocalDateKey, getMention
 
 test('fetchPullRequests separates human and Dependabot pull requests', async () => {
     const responses = new Map([
-        ['repo list bring --topic checkout --no-archived --limit 100 --json nameWithOwner', JSON.stringify([
-            { nameWithOwner: 'bring/checkout-api' }
+        ['repo list example-org --topic team-topic --no-archived --limit 100 --json nameWithOwner', JSON.stringify([
+            { nameWithOwner: 'example-org/example-repo' }
         ])],
         ['api user --jq .login', 'developer'],
-        ['pr list --repo bring/checkout-api --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision,comments,reviews', JSON.stringify([
+        ['pr list --repo example-org/example-repo --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision,comments,reviews', JSON.stringify([
             {
                 number: 2,
                 title: 'Dependency update',
-                url: 'https://github.com/bring/checkout-api/pull/2',
+                url: 'https://github.com/example-org/example-repo/pull/2',
                 author: { login: 'app/dependabot' },
                 createdAt: '2026-05-02T12:00:00Z',
                 updatedAt: '2026-06-02T12:00:00Z',
@@ -22,7 +22,7 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
             {
                 number: 3,
                 title: 'Newer dependency update',
-                url: 'https://github.com/bring/checkout-api/pull/3',
+                url: 'https://github.com/example-org/example-repo/pull/3',
                 author: { login: 'app/dependabot' },
                 createdAt: '2026-06-01T12:00:00Z',
                 updatedAt: '2026-06-02T13:00:00Z',
@@ -32,7 +32,7 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
             {
                 number: 1,
                 title: 'Feature',
-                url: 'https://github.com/bring/checkout-api/pull/1',
+                url: 'https://github.com/example-org/example-repo/pull/1',
                 author: { login: 'developer' },
                 createdAt: '2026-06-01T12:00:00Z',
                 updatedAt: '2026-06-01T12:00:00Z',
@@ -43,7 +43,7 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                         body: '@developer please check this',
                         createdAt: '2026-06-01T13:00:00Z',
                         updatedAt: '2026-06-01T13:00:00Z',
-                        url: 'https://github.com/bring/checkout-api/pull/1#issuecomment-1'
+                        url: 'https://github.com/example-org/example-repo/pull/1#issuecomment-1'
                     }
                 ],
                 reviews: [
@@ -52,11 +52,11 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 ]
             }
         ])],
-        ['pr list --repo bring/checkout-api --state merged --search merged:2026-06-03 --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,mergedAt,reviewDecision', JSON.stringify([
+        ['pr list --repo example-org/example-repo --state merged --search merged:2026-06-03 --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,mergedAt,reviewDecision', JSON.stringify([
             {
                 number: 4,
                 title: 'Merged feature',
-                url: 'https://github.com/bring/checkout-api/pull/4',
+                url: 'https://github.com/example-org/example-repo/pull/4',
                 author: { login: 'developer' },
                 createdAt: '2026-06-03T08:00:00Z',
                 updatedAt: '2026-06-03T09:00:00Z',
@@ -65,7 +65,7 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
             {
                 number: 5,
                 title: 'Merged dependency update',
-                url: 'https://github.com/bring/checkout-api/pull/5',
+                url: 'https://github.com/example-org/example-repo/pull/5',
                 author: { login: 'app/dependabot' },
                 createdAt: '2026-06-03T10:00:00Z',
                 updatedAt: '2026-06-03T11:00:00Z',
@@ -74,7 +74,7 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
             {
                 number: 6,
                 title: 'Merged yesterday',
-                url: 'https://github.com/bring/checkout-api/pull/6',
+                url: 'https://github.com/example-org/example-repo/pull/6',
                 author: { login: 'developer' },
                 createdAt: '2026-06-02T10:00:00Z',
                 updatedAt: '2026-06-02T11:00:00Z',
@@ -83,12 +83,12 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
         ])]
     ]);
 
-    const result = await fetchPullRequests({ organization: 'bring', topic: 'checkout' }, {
+    const result = await fetchPullRequests({ organization: 'example-org', topic: 'team-topic' }, {
         runGhImpl: async (args) => responses.get(args.join(' ')),
         today: '2026-06-03'
     });
 
-    assert.deepEqual(result.repositories, ['bring/checkout-api']);
+    assert.deepEqual(result.repositories, ['example-org/example-repo']);
     assert.equal(result.viewerLogin, 'developer');
     assert.deepEqual(result.pullRequests.map(({ number }) => number), [1]);
     assert.equal(result.pullRequests[0].commentActivityAt, '2026-06-01T15:00:00Z');
@@ -101,7 +101,7 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
 
 test('getMentionEvents detects direct mentions case-insensitively', () => {
     assert.deepEqual(getMentionEvents({
-        url: 'https://github.com/bring/repo/pull/1',
+        url: 'https://github.com/example-org/example-repo/pull/1',
         comments: [
             { id: '1', author: { login: 'alice' }, body: 'ping @Esschul', createdAt: '2026-06-03T08:00:00Z' },
             { id: '2', author: { login: 'bob' }, body: 'not @esschulbot', createdAt: '2026-06-03T09:00:00Z' }
@@ -130,6 +130,6 @@ test('getLocalDateKey formats a date as YYYY-MM-DD', () => {
 });
 
 test('validateConfig rejects invalid organization and topic values', () => {
-    assert.throws(() => validateConfig({ organization: '../bring', topic: 'checkout' }));
-    assert.throws(() => validateConfig({ organization: 'bring', topic: '--topic' }));
+    assert.throws(() => validateConfig({ organization: '../example-org', topic: 'team-topic' }));
+    assert.throws(() => validateConfig({ organization: 'example-org', topic: '--topic' }));
 });

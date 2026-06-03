@@ -6,11 +6,6 @@ const STORAGE_KEYS = {
     seenPullRequests: 'github-pr-dashboard:seen-pull-requests',
     theme: 'github-pr-dashboard:theme'
 };
-const DEFAULT_CONFIG = {
-    organization: 'bring',
-    topic: 'checkout'
-};
-
 const navItems = Array.from(document.querySelectorAll('.nav-item[data-view]'));
 const teamLabel = document.getElementById('teamLabel');
 const viewEyebrow = document.getElementById('viewEyebrow');
@@ -48,7 +43,11 @@ function readStoredJson(key, fallback) {
 }
 
 function getConfig() {
-    return readStoredJson(STORAGE_KEYS.config, DEFAULT_CONFIG);
+    return readStoredJson(STORAGE_KEYS.config, null);
+}
+
+function hasCompleteConfig(config) {
+    return Boolean(config?.organization?.trim() && config?.topic?.trim());
 }
 
 function saveConfig(config) {
@@ -291,6 +290,14 @@ async function notifyAboutNewPullRequests(config, pullRequests) {
 }
 
 async function refresh() {
+    const config = getConfig();
+    if (!hasCompleteConfig(config)) {
+        statusPanel.textContent = 'Configure GitHub organization and repository topic before refreshing.';
+        teamLabel.textContent = 'No team configured';
+        setView('settings');
+        return;
+    }
+
     if (refreshInProgress) return;
 
     refreshInProgress = true;
@@ -300,7 +307,7 @@ async function refresh() {
     errorPanel.innerHTML = '';
 
     try {
-        const result = await window.githubDashboard.fetchPullRequests(getConfig());
+        const result = await window.githubDashboard.fetchPullRequests(config);
         renderResult(result);
         await notifyAboutNewPullRequests(result.config, result.pullRequests);
         await notifyAboutNewMentions(result.config, result.pullRequests);
@@ -391,6 +398,10 @@ settingsForm.addEventListener('submit', (event) => {
         organization: organizationInput.value.trim(),
         topic: topicInput.value.trim()
     };
+    if (!hasCompleteConfig(config)) {
+        statusPanel.textContent = 'Both GitHub organization and repository topic are required.';
+        return;
+    }
     saveConfig(config);
     teamLabel.textContent = `${config.organization} / ${config.topic}`;
     setView('pull-requests');
@@ -406,10 +417,17 @@ document.addEventListener('click', async (event) => {
 });
 
 const initialConfig = getConfig();
-organizationInput.value = initialConfig.organization;
-topicInput.value = initialConfig.topic;
-teamLabel.textContent = `${initialConfig.organization} / ${initialConfig.topic}`;
+organizationInput.value = initialConfig?.organization || '';
+topicInput.value = initialConfig?.topic || '';
+teamLabel.textContent = hasCompleteConfig(initialConfig)
+    ? `${initialConfig.organization} / ${initialConfig.topic}`
+    : 'No team configured';
 applyTheme(window.localStorage.getItem(STORAGE_KEYS.theme));
-setView(activeView);
-refresh();
+if (hasCompleteConfig(initialConfig)) {
+    setView(activeView);
+    refresh();
+} else {
+    statusPanel.textContent = 'Configure GitHub organization and repository topic to get started.';
+    setView('settings');
+}
 window.setInterval(refresh, REFRESH_INTERVAL_MS);

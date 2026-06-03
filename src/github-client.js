@@ -2,10 +2,6 @@ const fs = require('node:fs');
 const { execFile } = require('node:child_process');
 
 const DEPENDABOT_LOGIN = 'app/dependabot';
-const DEFAULT_CONFIG = Object.freeze({
-    organization: 'bring',
-    topic: 'checkout'
-});
 const GH_CANDIDATES = [
     process.env.GH_PATH,
     '/opt/homebrew/bin/gh',
@@ -138,7 +134,7 @@ function normalizePullRequest(pullRequest, repository, viewerLogin) {
     };
 }
 
-async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
+async function fetchPullRequests(config, options = {}) {
     const normalizedConfig = validateConfig(config);
     const run = options.runGhImpl || runGh;
     const today = options.today || getLocalDateKey();
@@ -215,7 +211,6 @@ async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
 }
 
 module.exports = {
-    DEFAULT_CONFIG,
     DEPENDABOT_LOGIN,
     fetchPullRequests,
     getLatestCommentActivity,

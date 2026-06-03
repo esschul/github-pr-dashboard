@@ -87,7 +87,7 @@ function showPullRequestNotification(payload) {
 app.whenReady().then(() => {
     if (process.argv.includes('--test-notification')) {
         const wasShown = showPullRequestNotification({
-            title: 'New PR in bring/checkout-api',
+            title: 'New PR in example-org/example-repo',
             body: '#123 Local system notification test',
             authorLogin: 'local-test-user',
             url: TEST_NOTIFICATION_URL
