@@ -142,6 +142,15 @@ function getReviewStatusClass(pullRequest, statusLabel) {
     }[pullRequest.reviewDecision] || 'is-open';
 }
 
+function getCheckStatusClass(pullRequest) {
+    return {
+        success: 'is-success',
+        failure: 'is-failure',
+        pending: 'is-pending',
+        none: 'is-none'
+    }[pullRequest.checkStatus] || 'is-none';
+}
+
 function getAgeDetails(createdAt) {
     const createdDate = new Date(createdAt);
     if (Number.isNaN(createdDate.getTime())) {
@@ -188,6 +197,7 @@ function renderPullRequestList(element, pullRequests, emptyMessage, options = {}
             <div class="pull-request-actions">
                 ${pullRequest.hasNewComments ? '<span class="comment-pill">New comments</span>' : ''}
                 ${ageDetails ? `<span class="age-pill is-${ageDetails.level}">${escapeHtml(ageDetails.label)}</span>` : ''}
+                <span class="check-pill ${escapeHtml(getCheckStatusClass(pullRequest))}">${escapeHtml(pullRequest.checkStatusLabel || 'No checks')}</span>
                 <span class="status-pill ${escapeHtml(getReviewStatusClass(pullRequest, options.statusLabel))}">${escapeHtml(options.statusLabel || getReviewLabel(pullRequest))}</span>
                 <button class="secondary-button" type="button" data-pull-request-url="${escapeAttribute(pullRequest.url)}">Open</button>
             </div>

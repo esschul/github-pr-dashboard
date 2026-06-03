@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { fetchPullRequests, getLatestCommentActivity, getLocalDateKey, getMentionEvents, validateConfig } = require('../src/github-client');
+const { fetchPullRequests, getLatestCommentActivity, getLocalDateKey, getMentionEvents, normalizeCheckStatus, validateConfig } = require('../src/github-client');
 
 test('fetchPullRequests separates human and Dependabot pull requests', async () => {
     const responses = new Map([
@@ -8,7 +8,7 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
             { nameWithOwner: 'example-org/example-repo' }
         ])],
         ['api user --jq .login', 'developer'],
-        ['pr list --repo example-org/example-repo --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision,comments,reviews', JSON.stringify([
+        ['pr list --repo example-org/example-repo --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision,statusCheckRollup,comments,reviews', JSON.stringify([
             {
                 number: 2,
                 title: 'Dependency update',
@@ -16,6 +16,9 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 author: { login: 'app/dependabot' },
                 createdAt: '2026-05-02T12:00:00Z',
                 updatedAt: '2026-06-02T12:00:00Z',
+                statusCheckRollup: [
+                    { __typename: 'CheckRun', conclusion: 'FAILURE', status: 'COMPLETED' }
+                ],
                 comments: [],
                 reviews: []
             },
@@ -26,6 +29,9 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 author: { login: 'app/dependabot' },
                 createdAt: '2026-06-01T12:00:00Z',
                 updatedAt: '2026-06-02T13:00:00Z',
+                statusCheckRollup: [
+                    { __typename: 'CheckRun', conclusion: 'SUCCESS', status: 'COMPLETED' }
+                ],
                 comments: [],
                 reviews: []
             },
@@ -36,6 +42,9 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 author: { login: 'developer' },
                 createdAt: '2026-06-01T12:00:00Z',
                 updatedAt: '2026-06-01T12:00:00Z',
+                statusCheckRollup: [
+                    { __typename: 'CheckRun', conclusion: 'SUCCESS', status: 'COMPLETED' }
+                ],
                 comments: [
                     {
                         id: 'comment-1',
@@ -52,7 +61,7 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 ]
             }
         ])],
-        ['pr list --repo example-org/example-repo --state merged --search merged:2026-06-03 --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,mergedAt,reviewDecision', JSON.stringify([
+        ['pr list --repo example-org/example-repo --state merged --search merged:2026-06-03 --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,mergedAt,reviewDecision,statusCheckRollup', JSON.stringify([
             {
                 number: 4,
                 title: 'Merged feature',
@@ -60,7 +69,10 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 author: { login: 'developer' },
                 createdAt: '2026-06-03T08:00:00Z',
                 updatedAt: '2026-06-03T09:00:00Z',
-                mergedAt: '2026-06-03T09:00:00Z'
+                mergedAt: '2026-06-03T09:00:00Z',
+                statusCheckRollup: [
+                    { __typename: 'CheckRun', conclusion: 'SUCCESS', status: 'COMPLETED' }
+                ]
             },
             {
                 number: 5,
@@ -69,7 +81,10 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 author: { login: 'app/dependabot' },
                 createdAt: '2026-06-03T10:00:00Z',
                 updatedAt: '2026-06-03T11:00:00Z',
-                mergedAt: '2026-06-03T11:00:00Z'
+                mergedAt: '2026-06-03T11:00:00Z',
+                statusCheckRollup: [
+                    { __typename: 'CheckRun', conclusion: 'SUCCESS', status: 'COMPLETED' }
+                ]
             },
             {
                 number: 6,
@@ -78,7 +93,10 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 author: { login: 'developer' },
                 createdAt: '2026-06-02T10:00:00Z',
                 updatedAt: '2026-06-02T11:00:00Z',
-                mergedAt: '2026-06-02T11:00:00Z'
+                mergedAt: '2026-06-02T11:00:00Z',
+                statusCheckRollup: [
+                    { __typename: 'CheckRun', conclusion: 'SUCCESS', status: 'COMPLETED' }
+                ]
             }
         ])]
     ]);
@@ -91,12 +109,15 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
     assert.deepEqual(result.repositories, ['example-org/example-repo']);
     assert.equal(result.viewerLogin, 'developer');
     assert.deepEqual(result.pullRequests.map(({ number }) => number), [1]);
+    assert.equal(result.pullRequests[0].checkStatus, 'success');
+    assert.equal(result.pullRequests[0].checkStatusLabel, 'Checks passing');
     assert.equal(result.pullRequests[0].commentActivityAt, '2026-06-01T15:00:00Z');
     assert.equal(result.pullRequests[0].commentActivityCount, 2);
     assert.deepEqual(result.pullRequests[0].mentionEvents.map(({ id }) => id), ['comment-1']);
     assert.deepEqual(result.mergedPullRequests.map(({ number }) => number), [4]);
     assert.deepEqual(result.mergedDependabotPullRequests.map(({ number }) => number), [5]);
     assert.deepEqual(result.dependabotPullRequests.map(({ number }) => number), [2, 3]);
+    assert.deepEqual(result.dependabotPullRequests.map(({ checkStatus }) => checkStatus), ['failure', 'success']);
 });
 
 test('getMentionEvents detects direct mentions case-insensitively', () => {
@@ -127,6 +148,37 @@ test('getLatestCommentActivity ignores reviews without a body', () => {
 
 test('getLocalDateKey formats a date as YYYY-MM-DD', () => {
     assert.equal(getLocalDateKey('2026-06-03T12:30:00Z'), '2026-06-03');
+});
+
+test('normalizeCheckStatus summarizes status check rollups', () => {
+    assert.deepEqual(normalizeCheckStatus({ statusCheckRollup: [] }), {
+        checkStatus: 'none',
+        checkStatusLabel: 'No checks'
+    });
+    assert.deepEqual(normalizeCheckStatus({
+        statusCheckRollup: [{ __typename: 'CheckRun', conclusion: 'SUCCESS', status: 'COMPLETED' }]
+    }), {
+        checkStatus: 'success',
+        checkStatusLabel: 'Checks passing'
+    });
+    assert.deepEqual(normalizeCheckStatus({
+        statusCheckRollup: [{ __typename: 'CheckRun', conclusion: 'FAILURE', status: 'COMPLETED' }]
+    }), {
+        checkStatus: 'failure',
+        checkStatusLabel: 'Checks failing'
+    });
+    assert.deepEqual(normalizeCheckStatus({
+        statusCheckRollup: [{ __typename: 'CheckRun', conclusion: null, status: 'IN_PROGRESS' }]
+    }), {
+        checkStatus: 'pending',
+        checkStatusLabel: 'Checks pending'
+    });
+    assert.deepEqual(normalizeCheckStatus({
+        statusCheckRollup: [{ __typename: 'StatusContext', state: 'SUCCESS' }]
+    }), {
+        checkStatus: 'success',
+        checkStatusLabel: 'Checks passing'
+    });
 });
 
 test('validateConfig rejects invalid organization and topic values', () => {

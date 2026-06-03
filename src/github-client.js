@@ -8,8 +8,8 @@ const GH_CANDIDATES = [
     '/usr/local/bin/gh',
     'gh'
 ].filter(Boolean);
-const OPEN_PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision,comments,reviews';
-const MERGED_PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,mergedAt,reviewDecision';
+const OPEN_PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision,statusCheckRollup,comments,reviews';
+const MERGED_PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,mergedAt,reviewDecision,statusCheckRollup';
 
 function resolveGhPath() {
     return GH_CANDIDATES.find((candidate) => candidate === 'gh' || fs.existsSync(candidate)) || 'gh';
@@ -125,10 +125,62 @@ function getMentionEvents(pullRequest, viewerLogin) {
         .sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt)));
 }
 
+function normalizeCheckStatus(pullRequest) {
+    const checks = pullRequest.statusCheckRollup || [];
+    if (!checks.length) {
+        return {
+            checkStatus: 'none',
+            checkStatusLabel: 'No checks'
+        };
+    }
+
+    const hasFailure = checks.some((check) => [
+        'ACTION_REQUIRED',
+        'CANCELLED',
+        'ERROR',
+        'FAILURE',
+        'STALE',
+        'STARTUP_FAILURE',
+        'TIMED_OUT'
+    ].includes(check.conclusion || check.state));
+    if (hasFailure) {
+        return {
+            checkStatus: 'failure',
+            checkStatusLabel: 'Checks failing'
+        };
+    }
+
+    const hasPending = checks.some((check) => {
+        const state = check.state || check.status;
+        if (check.conclusion) {
+            return false;
+        }
+        if (state === 'SUCCESS') {
+            return false;
+        }
+        if (state) {
+            return state !== 'COMPLETED';
+        }
+        return true;
+    });
+    if (hasPending) {
+        return {
+            checkStatus: 'pending',
+            checkStatusLabel: 'Checks pending'
+        };
+    }
+
+    return {
+        checkStatus: 'success',
+        checkStatusLabel: 'Checks passing'
+    };
+}
+
 function normalizePullRequest(pullRequest, repository, viewerLogin) {
     return {
         ...pullRequest,
         ...getLatestCommentActivity(pullRequest),
+        ...normalizeCheckStatus(pullRequest),
         mentionEvents: getMentionEvents(pullRequest, viewerLogin),
         repository
     };
@@ -181,10 +233,7 @@ async function fetchPullRequests(config, options = {}) {
 
         return {
             pullRequests: pullRequests.map((pullRequest) => normalizePullRequest(pullRequest, nameWithOwner, viewerLogin)),
-            mergedPullRequests: mergedPullRequests.map((pullRequest) => ({
-                ...pullRequest,
-                repository: nameWithOwner
-            }))
+            mergedPullRequests: mergedPullRequests.map((pullRequest) => normalizePullRequest(pullRequest, nameWithOwner, viewerLogin))
         };
     }));
 
@@ -216,6 +265,7 @@ module.exports = {
     getLatestCommentActivity,
     getLocalDateKey,
     getMentionEvents,
+    normalizeCheckStatus,
     resolveGhPath,
     runGh,
     validateConfig

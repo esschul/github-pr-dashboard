@@ -136,6 +136,7 @@ h3 {
 
 .nav-count,
 .pill,
+.check-pill,
 .status-pill {
     padding: 4px 8px;
     border-radius: 999px;
@@ -143,6 +144,31 @@ h3 {
     color: var(--muted);
     font-size: 0.78rem;
     font-weight: 700;
+}
+
+.check-pill {
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.check-pill.is-success {
+    background: #e8f6ed;
+    color: #237441;
+}
+
+.check-pill.is-failure {
+    background: #ffe0de;
+    color: #b42318;
+}
+
+.check-pill.is-pending {
+    background: #fff6d9;
+    color: #856300;
+}
+
+.check-pill.is-none {
+    background: var(--panel-muted);
+    color: var(--muted);
 }
 
 .status-pill {
@@ -192,6 +218,21 @@ h3 {
 :root[data-theme="dark"] .status-pill.is-draft {
     background: #37324b;
     color: #cdc2f0;
+}
+
+:root[data-theme="dark"] .check-pill.is-success {
+    background: #1e4930;
+    color: #a6e9ba;
+}
+
+:root[data-theme="dark"] .check-pill.is-failure {
+    background: #5b2928;
+    color: #ffaaa4;
+}
+
+:root[data-theme="dark"] .check-pill.is-pending {
+    background: #524315;
+    color: #ffe596;
 }
 
 .age-pill {
