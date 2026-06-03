@@ -28,6 +28,9 @@ const pullRequestsList = document.getElementById('pullRequestsList');
 const mergedTodayList = document.getElementById('mergedTodayList');
 const mergedTodayDependabotList = document.getElementById('mergedTodayDependabotList');
 const dependabotList = document.getElementById('dependabotList');
+const pullRequestsCount = document.getElementById('pullRequestsCount');
+const mergedTodayCount = document.getElementById('mergedTodayCount');
+const dependabotCount = document.getElementById('dependabotCount');
 const settingsForm = document.getElementById('settingsForm');
 const organizationInput = document.getElementById('organizationInput');
 const topicInput = document.getElementById('topicInput');
@@ -202,6 +205,9 @@ function renderResult(result) {
         statusLabel: 'Merged'
     });
     renderPullRequestList(dependabotList, result.dependabotPullRequests, 'No Dependabot pull requests are open.', { showAge: true });
+    pullRequestsCount.textContent = result.pullRequests.length;
+    mergedTodayCount.textContent = result.mergedPullRequests.length + result.mergedDependabotPullRequests.length;
+    dependabotCount.textContent = result.dependabotPullRequests.length;
     teamLabel.textContent = `${result.config.organization} / ${result.config.topic}`;
     statusPanel.textContent = `${result.repositories.length} repositories · Updated ${formatDate(result.refreshedAt)}`;
 }
