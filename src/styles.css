@@ -134,9 +134,7 @@ h3 {
     background: var(--panel-muted);
 }
 
-.nav-count,
 .pill,
-.section-count,
 .status-pill {
     padding: 4px 8px;
     border-radius: 999px;
