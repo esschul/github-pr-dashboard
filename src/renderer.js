@@ -118,7 +118,9 @@ function formatDate(value) {
 }
 
 function getReviewLabel(pullRequest) {
-    if (pullRequest.isDraft) return 'Draft';
+    if (pullRequest.isDraft) {
+        return 'Draft';
+    }
     return {
         APPROVED: 'Approved',
         CHANGES_REQUESTED: 'Changes requested',
@@ -127,8 +129,12 @@ function getReviewLabel(pullRequest) {
 }
 
 function getReviewStatusClass(pullRequest, statusLabel) {
-    if (statusLabel === 'Merged') return 'is-merged';
-    if (pullRequest.isDraft) return 'is-draft';
+    if (statusLabel === 'Merged') {
+        return 'is-merged';
+    }
+    if (pullRequest.isDraft) {
+        return 'is-draft';
+    }
     return {
         APPROVED: 'is-approved',
         CHANGES_REQUESTED: 'is-changes-requested',
@@ -298,7 +304,9 @@ async function refresh() {
         return;
     }
 
-    if (refreshInProgress) return;
+    if (refreshInProgress) {
+        return;
+    }
 
     refreshInProgress = true;
     refreshButton.disabled = true;

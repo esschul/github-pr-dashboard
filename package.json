@@ -8,13 +8,15 @@
     "start": "electron .",
     "test:notification": "electron . --test-notification",
     "test": "node --test",
+    "lint": "eslint .",
     "check": "node --check src/github-client.js && node --check src/notification-policy.js && node --check src/main.js && node --check src/preload.js && node --check src/renderer.js",
     "build:icon": "bash scripts/build-mac-icon.sh",
     "build:mac": "electron-builder --mac dmg"
   },
   "devDependencies": {
     "electron": "^42.3.1",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "eslint": "^10.4.1"
   },
   "build": {
     "appId": "no.esschul.github-pr-dashboard",
