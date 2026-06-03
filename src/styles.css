@@ -127,11 +127,6 @@ button {
     padding: 10px;
 }
 
-.app-shell.is-sidebar-collapsed .nav-count {
-    min-width: 28px;
-    text-align: center;
-}
-
 h1,
 h2,
 h3,
@@ -194,7 +189,6 @@ h3 {
     background: var(--panel-muted);
 }
 
-.nav-count,
 .pill,
 .check-pill,
 .status-pill {
@@ -204,6 +198,33 @@ h3 {
     color: var(--muted);
     font-size: 0.78rem;
     font-weight: 700;
+}
+
+.nav-icon {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--panel-muted);
+    color: var(--muted);
+}
+
+.nav-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.nav-icon.is-merged {
+    background: #f0eef6;
+    color: #65558f;
+}
+
+:root[data-theme="dark"] .nav-icon.is-merged {
+    background: #37324b;
+    color: #cdc2f0;
 }
 
 .check-pill {
