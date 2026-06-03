@@ -186,6 +186,10 @@ function getCheckStatusClass(pullRequest) {
     }[pullRequest.checkStatus] || 'is-none';
 }
 
+function hasCheckStatus(pullRequest, status, label) {
+    return pullRequest.checkStatus === status || pullRequest.checkStatusLabel === label;
+}
+
 function matchesPullRequestFilter(pullRequest, filter) {
     if (filter === 'approved') {
         return pullRequest.reviewDecision === 'APPROVED' && !pullRequest.isDraft;
@@ -200,10 +204,10 @@ function matchesPullRequestFilter(pullRequest, filter) {
         return Boolean(pullRequest.isDraft);
     }
     if (filter === 'checks-failing') {
-        return pullRequest.checkStatus === 'failure';
+        return hasCheckStatus(pullRequest, 'failure', 'Checks failing');
     }
     if (filter === 'checks-pending') {
-        return pullRequest.checkStatus === 'pending';
+        return hasCheckStatus(pullRequest, 'pending', 'Checks pending');
     }
     return true;
 }
