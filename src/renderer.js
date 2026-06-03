@@ -2,6 +2,7 @@ const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
 const STORAGE_KEYS = {
     commentActivitySeen: 'github-pr-dashboard:comment-activity-seen',
     config: 'github-pr-dashboard:config',
+    mentionsSeen: 'github-pr-dashboard:mentions-seen',
     seenPullRequests: 'github-pr-dashboard:seen-pull-requests',
     theme: 'github-pr-dashboard:theme'
 };
@@ -60,6 +61,20 @@ function saveSeenCommentActivityState(config, state) {
     const states = readStoredJson(STORAGE_KEYS.commentActivitySeen, {});
     states[getTeamKey(config)] = state;
     window.localStorage.setItem(STORAGE_KEYS.commentActivitySeen, JSON.stringify(states));
+}
+
+function getSeenMentionState(config) {
+    const states = readStoredJson(STORAGE_KEYS.mentionsSeen, {});
+    return states[getTeamKey(config)] || {
+        initialized: false,
+        ids: []
+    };
+}
+
+function saveSeenMentionState(config, state) {
+    const states = readStoredJson(STORAGE_KEYS.mentionsSeen, {});
+    states[getTeamKey(config)] = state;
+    window.localStorage.setItem(STORAGE_KEYS.mentionsSeen, JSON.stringify(states));
 }
 
 function getTeamKey(config) {
@@ -282,6 +297,7 @@ async function refresh() {
         const result = await window.githubDashboard.fetchPullRequests(getConfig());
         renderResult(result);
         await notifyAboutNewPullRequests(result.config, result.pullRequests);
+        await notifyAboutNewMentions(result.config, result.pullRequests);
     } catch (error) {
         statusPanel.textContent = 'Refresh failed.';
         errorPanel.classList.remove('hidden');
@@ -293,6 +309,37 @@ async function refresh() {
         refreshInProgress = false;
         refreshButton.disabled = false;
     }
+}
+
+async function notifyAboutNewMentions(config, pullRequests) {
+    const seenState = getSeenMentionState(config);
+    const seenIds = new Set(seenState.ids);
+    const mentionEvents = (pullRequests || []).flatMap((pullRequest) => (pullRequest.mentionEvents || []).map((event) => ({
+        ...event,
+        pullRequest
+    })));
+
+    if (!seenState.initialized) {
+        saveSeenMentionState(config, {
+            initialized: true,
+            ids: mentionEvents.map((event) => event.id)
+        });
+        return;
+    }
+
+    const newMentionEvents = mentionEvents.filter((event) => !seenIds.has(event.id));
+    newMentionEvents.forEach((event) => seenIds.add(event.id));
+    saveSeenMentionState(config, {
+        initialized: true,
+        ids: Array.from(seenIds).slice(-500)
+    });
+
+    await Promise.all(newMentionEvents.map((event) => window.githubDashboard.showNotification({
+        title: `You were mentioned in ${event.pullRequest.repository}`,
+        body: `#${event.pullRequest.number} ${event.pullRequest.title}`,
+        authorLogin: event.pullRequest.author?.login,
+        url: event.url || event.pullRequest.url
+    })));
 }
 
 function setView(view) {

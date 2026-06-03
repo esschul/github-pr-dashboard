@@ -99,10 +99,41 @@ function getLatestCommentActivity(pullRequest) {
     };
 }
 
-function normalizePullRequest(pullRequest, repository) {
+function getMentionEvents(pullRequest, viewerLogin) {
+    if (!viewerLogin) {
+        return [];
+    }
+
+    const mentionPattern = new RegExp(`(^|[^\\w-])@${viewerLogin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    const issueComments = (pullRequest.comments || []).map((comment) => ({
+        id: comment.id || `${pullRequest.url}#comment-${comment.createdAt}`,
+        authorLogin: comment.author?.login || 'unknown',
+        body: comment.body || '',
+        createdAt: comment.createdAt || comment.updatedAt,
+        url: comment.url || pullRequest.url,
+        type: 'comment'
+    }));
+    const reviewComments = (pullRequest.reviews || [])
+        .filter((review) => String(review.body || '').trim())
+        .map((review) => ({
+            id: review.id || `${pullRequest.url}#review-${review.submittedAt}`,
+            authorLogin: review.author?.login || 'unknown',
+            body: review.body || '',
+            createdAt: review.submittedAt || review.updatedAt || review.createdAt,
+            url: pullRequest.url,
+            type: 'review'
+        }));
+
+    return [...issueComments, ...reviewComments]
+        .filter((event) => event.createdAt && mentionPattern.test(event.body))
+        .sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt)));
+}
+
+function normalizePullRequest(pullRequest, repository, viewerLogin) {
     return {
         ...pullRequest,
         ...getLatestCommentActivity(pullRequest),
+        mentionEvents: getMentionEvents(pullRequest, viewerLogin),
         repository
     };
 }
@@ -111,6 +142,7 @@ async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
     const normalizedConfig = validateConfig(config);
     const run = options.runGhImpl || runGh;
     const today = options.today || getLocalDateKey();
+    const viewerLogin = options.viewerLogin || String(await run(['api', 'user', '--jq', '.login'])).trim();
     const repositories = parseJson(await run([
         'repo',
         'list',
@@ -152,7 +184,7 @@ async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
         ]), `merged pull requests for ${nameWithOwner}`);
 
         return {
-            pullRequests: pullRequests.map((pullRequest) => normalizePullRequest(pullRequest, nameWithOwner)),
+            pullRequests: pullRequests.map((pullRequest) => normalizePullRequest(pullRequest, nameWithOwner, viewerLogin)),
             mergedPullRequests: mergedPullRequests.map((pullRequest) => ({
                 ...pullRequest,
                 repository: nameWithOwner
@@ -170,6 +202,7 @@ async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
 
     return {
         config: normalizedConfig,
+        viewerLogin,
         repositories: repositories.map(({ nameWithOwner }) => nameWithOwner),
         pullRequests: pullRequests.filter((pullRequest) => pullRequest.author?.login !== DEPENDABOT_LOGIN),
         mergedPullRequests: mergedPullRequests.filter((pullRequest) => pullRequest.author?.login !== DEPENDABOT_LOGIN),
@@ -187,6 +220,7 @@ module.exports = {
     fetchPullRequests,
     getLatestCommentActivity,
     getLocalDateKey,
+    getMentionEvents,
     resolveGhPath,
     runGh,
     validateConfig

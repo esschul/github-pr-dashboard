@@ -1,12 +1,13 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { fetchPullRequests, getLatestCommentActivity, getLocalDateKey, validateConfig } = require('../src/github-client');
+const { fetchPullRequests, getLatestCommentActivity, getLocalDateKey, getMentionEvents, validateConfig } = require('../src/github-client');
 
 test('fetchPullRequests separates human and Dependabot pull requests', async () => {
     const responses = new Map([
         ['repo list bring --topic checkout --no-archived --limit 100 --json nameWithOwner', JSON.stringify([
             { nameWithOwner: 'bring/checkout-api' }
         ])],
+        ['api user --jq .login', 'developer'],
         ['pr list --repo bring/checkout-api --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision,comments,reviews', JSON.stringify([
             {
                 number: 2,
@@ -36,7 +37,14 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 createdAt: '2026-06-01T12:00:00Z',
                 updatedAt: '2026-06-01T12:00:00Z',
                 comments: [
-                    { createdAt: '2026-06-01T13:00:00Z', updatedAt: '2026-06-01T13:00:00Z' }
+                    {
+                        id: 'comment-1',
+                        author: { login: 'reviewer' },
+                        body: '@developer please check this',
+                        createdAt: '2026-06-01T13:00:00Z',
+                        updatedAt: '2026-06-01T13:00:00Z',
+                        url: 'https://github.com/bring/checkout-api/pull/1#issuecomment-1'
+                    }
                 ],
                 reviews: [
                     { body: '', submittedAt: '2026-06-01T14:00:00Z' },
@@ -81,12 +89,27 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
     });
 
     assert.deepEqual(result.repositories, ['bring/checkout-api']);
+    assert.equal(result.viewerLogin, 'developer');
     assert.deepEqual(result.pullRequests.map(({ number }) => number), [1]);
     assert.equal(result.pullRequests[0].commentActivityAt, '2026-06-01T15:00:00Z');
     assert.equal(result.pullRequests[0].commentActivityCount, 2);
+    assert.deepEqual(result.pullRequests[0].mentionEvents.map(({ id }) => id), ['comment-1']);
     assert.deepEqual(result.mergedPullRequests.map(({ number }) => number), [4]);
     assert.deepEqual(result.mergedDependabotPullRequests.map(({ number }) => number), [5]);
     assert.deepEqual(result.dependabotPullRequests.map(({ number }) => number), [2, 3]);
+});
+
+test('getMentionEvents detects direct mentions case-insensitively', () => {
+    assert.deepEqual(getMentionEvents({
+        url: 'https://github.com/bring/repo/pull/1',
+        comments: [
+            { id: '1', author: { login: 'alice' }, body: 'ping @Esschul', createdAt: '2026-06-03T08:00:00Z' },
+            { id: '2', author: { login: 'bob' }, body: 'not @esschulbot', createdAt: '2026-06-03T09:00:00Z' }
+        ],
+        reviews: [
+            { id: '3', author: { login: 'carol' }, body: '@esschul can you approve?', submittedAt: '2026-06-03T10:00:00Z' }
+        ]
+    }, 'esschul').map(({ id }) => id), ['1', '3']);
 });
 
 test('getLatestCommentActivity ignores reviews without a body', () => {
