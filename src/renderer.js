@@ -18,6 +18,10 @@ const PULL_REQUEST_FILTERS = [
     'checks-failing',
     'checks-pending'
 ];
+const DEPENDABOT_PULL_REQUEST_FILTERS = [
+    'all',
+    'checks-failing'
+];
 const appShell = document.querySelector('.app-shell');
 const navItems = Array.from(document.querySelectorAll('.nav-item[data-view]'));
 const teamLabel = document.getElementById('teamLabel');
@@ -45,12 +49,7 @@ const filterCountChecksFailing = document.getElementById('filterCountChecksFaili
 const filterCountChecksPending = document.getElementById('filterCountChecksPending');
 const dependabotFilterButtons = Array.from(document.querySelectorAll('#dependabotFilters .filter-chip'));
 const dependabotFilterCountAll = document.getElementById('dependabotFilterCountAll');
-const dependabotFilterCountApproved = document.getElementById('dependabotFilterCountApproved');
-const dependabotFilterCountPending = document.getElementById('dependabotFilterCountPending');
-const dependabotFilterCountChangesRequested = document.getElementById('dependabotFilterCountChangesRequested');
-const dependabotFilterCountDraft = document.getElementById('dependabotFilterCountDraft');
 const dependabotFilterCountChecksFailing = document.getElementById('dependabotFilterCountChecksFailing');
-const dependabotFilterCountChecksPending = document.getElementById('dependabotFilterCountChecksPending');
 const mergedTodayList = document.getElementById('mergedTodayList');
 const mergedTodayDependabotList = document.getElementById('mergedTodayDependabotList');
 const dependabotList = document.getElementById('dependabotList');
@@ -62,8 +61,8 @@ const organizationInput = document.getElementById('organizationInput');
 const topicInput = document.getElementById('topicInput');
 
 let activeView = 'pull-requests';
-let activeHumanPullRequestFilter = getStoredPullRequestFilter(STORAGE_KEYS.humanPullRequestFilter);
-let activeDependabotPullRequestFilter = getStoredPullRequestFilter(STORAGE_KEYS.dependabotPullRequestFilter);
+let activeHumanPullRequestFilter = getStoredPullRequestFilter(STORAGE_KEYS.humanPullRequestFilter, PULL_REQUEST_FILTERS);
+let activeDependabotPullRequestFilter = getStoredPullRequestFilter(STORAGE_KEYS.dependabotPullRequestFilter, DEPENDABOT_PULL_REQUEST_FILTERS);
 let refreshInProgress = false;
 let latestHumanPullRequests = [];
 let latestDependabotPullRequests = [];
@@ -212,9 +211,9 @@ function matchesPullRequestFilter(pullRequest, filter) {
     return true;
 }
 
-function getStoredPullRequestFilter(storageKey) {
+function getStoredPullRequestFilter(storageKey, availableFilters) {
     const storedFilter = window.localStorage.getItem(storageKey);
-    return PULL_REQUEST_FILTERS.includes(storedFilter) ? storedFilter : 'all';
+    return availableFilters.includes(storedFilter) ? storedFilter : 'all';
 }
 
 function getFilteredHumanPullRequests() {
@@ -227,12 +226,24 @@ function getFilteredDependabotPullRequests() {
 
 function updatePullRequestFilterCounts(pullRequests, elements) {
     elements.all.textContent = pullRequests.length;
-    elements.approved.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'approved')).length;
-    elements.pending.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'pending')).length;
-    elements.changesRequested.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'changes-requested')).length;
-    elements.draft.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'draft')).length;
-    elements.checksFailing.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'checks-failing')).length;
-    elements.checksPending.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'checks-pending')).length;
+    if (elements.approved) {
+        elements.approved.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'approved')).length;
+    }
+    if (elements.pending) {
+        elements.pending.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'pending')).length;
+    }
+    if (elements.changesRequested) {
+        elements.changesRequested.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'changes-requested')).length;
+    }
+    if (elements.draft) {
+        elements.draft.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'draft')).length;
+    }
+    if (elements.checksFailing) {
+        elements.checksFailing.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'checks-failing')).length;
+    }
+    if (elements.checksPending) {
+        elements.checksPending.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'checks-pending')).length;
+    }
 }
 
 function applyHumanPullRequestFilter(filter) {
@@ -251,7 +262,7 @@ function applyHumanPullRequestFilter(filter) {
 }
 
 function applyDependabotPullRequestFilter(filter) {
-    activeDependabotPullRequestFilter = PULL_REQUEST_FILTERS.includes(filter) ? filter : 'all';
+    activeDependabotPullRequestFilter = DEPENDABOT_PULL_REQUEST_FILTERS.includes(filter) ? filter : 'all';
     window.localStorage.setItem(STORAGE_KEYS.dependabotPullRequestFilter, activeDependabotPullRequestFilter);
     dependabotFilterButtons.forEach((button) => {
         button.classList.toggle('is-active', button.dataset.filter === activeDependabotPullRequestFilter);
@@ -336,12 +347,7 @@ function renderResult(result) {
     });
     updatePullRequestFilterCounts(latestDependabotPullRequests, {
         all: dependabotFilterCountAll,
-        approved: dependabotFilterCountApproved,
-        pending: dependabotFilterCountPending,
-        changesRequested: dependabotFilterCountChangesRequested,
-        draft: dependabotFilterCountDraft,
-        checksFailing: dependabotFilterCountChecksFailing,
-        checksPending: dependabotFilterCountChecksPending
+        checksFailing: dependabotFilterCountChecksFailing
     });
     applyHumanPullRequestFilter(activeHumanPullRequestFilter);
     renderPullRequestList(mergedTodayList, result.mergedPullRequests, 'No human-authored pull requests have been merged today.', {
