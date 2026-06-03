@@ -20,7 +20,8 @@ const PULL_REQUEST_FILTERS = [
 ];
 const DEPENDABOT_PULL_REQUEST_FILTERS = [
     'all',
-    'checks-failing'
+    'checks-failing',
+    'checks-passed'
 ];
 const appShell = document.querySelector('.app-shell');
 const navItems = Array.from(document.querySelectorAll('.nav-item[data-view]'));
@@ -50,6 +51,7 @@ const filterCountChecksPending = document.getElementById('filterCountChecksPendi
 const dependabotFilterButtons = Array.from(document.querySelectorAll('#dependabotFilters .filter-chip'));
 const dependabotFilterCountAll = document.getElementById('dependabotFilterCountAll');
 const dependabotFilterCountChecksFailing = document.getElementById('dependabotFilterCountChecksFailing');
+const dependabotFilterCountChecksPassed = document.getElementById('dependabotFilterCountChecksPassed');
 const mergedTodayList = document.getElementById('mergedTodayList');
 const mergedTodayDependabotList = document.getElementById('mergedTodayDependabotList');
 const dependabotList = document.getElementById('dependabotList');
@@ -205,6 +207,9 @@ function matchesPullRequestFilter(pullRequest, filter) {
     if (filter === 'checks-failing') {
         return hasCheckStatus(pullRequest, 'failure', 'Checks failing');
     }
+    if (filter === 'checks-passed') {
+        return hasCheckStatus(pullRequest, 'success', 'Checks passing');
+    }
     if (filter === 'checks-pending') {
         return hasCheckStatus(pullRequest, 'pending', 'Checks pending');
     }
@@ -240,6 +245,9 @@ function updatePullRequestFilterCounts(pullRequests, elements) {
     }
     if (elements.checksFailing) {
         elements.checksFailing.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'checks-failing')).length;
+    }
+    if (elements.checksPassed) {
+        elements.checksPassed.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'checks-passed')).length;
     }
     if (elements.checksPending) {
         elements.checksPending.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'checks-pending')).length;
@@ -347,7 +355,8 @@ function renderResult(result) {
     });
     updatePullRequestFilterCounts(latestDependabotPullRequests, {
         all: dependabotFilterCountAll,
-        checksFailing: dependabotFilterCountChecksFailing
+        checksFailing: dependabotFilterCountChecksFailing,
+        checksPassed: dependabotFilterCountChecksPassed
     });
     applyHumanPullRequestFilter(activeHumanPullRequestFilter);
     renderPullRequestList(mergedTodayList, result.mergedPullRequests, 'No human-authored pull requests have been merged today.', {
