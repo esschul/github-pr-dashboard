@@ -135,13 +135,64 @@ h3 {
 }
 
 .nav-count,
-.pill {
+.pill,
+.section-count,
+.status-pill {
     padding: 4px 8px;
     border-radius: 999px;
     background: var(--panel-muted);
     color: var(--muted);
     font-size: 0.78rem;
     font-weight: 700;
+}
+
+.status-pill {
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.status-pill.is-approved,
+.status-pill.is-merged {
+    background: #e8f6ed;
+    color: #237441;
+}
+
+.status-pill.is-pending,
+.status-pill.is-open {
+    background: #eef4ff;
+    color: #215db0;
+}
+
+.status-pill.is-changes-requested {
+    background: #ffe0de;
+    color: #b42318;
+}
+
+.status-pill.is-draft {
+    background: #f0eef6;
+    color: #65558f;
+}
+
+:root[data-theme="dark"] .status-pill.is-approved,
+:root[data-theme="dark"] .status-pill.is-merged {
+    background: #1e4930;
+    color: #a6e9ba;
+}
+
+:root[data-theme="dark"] .status-pill.is-pending,
+:root[data-theme="dark"] .status-pill.is-open {
+    background: #213a5f;
+    color: #a9cbff;
+}
+
+:root[data-theme="dark"] .status-pill.is-changes-requested {
+    background: #5b2928;
+    color: #ffaaa4;
+}
+
+:root[data-theme="dark"] .status-pill.is-draft {
+    background: #37324b;
+    color: #cdc2f0;
 }
 
 .age-pill {
@@ -229,6 +280,32 @@ h3 {
     max-height: 100%;
     overflow-y: auto;
     padding-right: 6px;
+}
+
+.merged-sections {
+    display: grid;
+    min-height: 0;
+    height: 100%;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 0.9fr);
+    gap: 22px;
+}
+
+.merged-section {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.section-heading h3 {
+    margin-bottom: 0;
 }
 
 .view:not(.hidden) {

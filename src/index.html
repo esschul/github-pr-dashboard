@@ -20,6 +20,10 @@
                     Pull requests
                     <span id="pullRequestsCount" class="nav-count">0</span>
                 </button>
+                <button class="nav-item" type="button" data-view="merged-today">
+                    Merged today
+                    <span id="mergedTodayCount" class="nav-count">0</span>
+                </button>
                 <button class="nav-item" type="button" data-view="dependabot">
                     Dependabot
                     <span id="dependabotCount" class="nav-count">0</span>
@@ -51,6 +55,26 @@
 
             <section id="pullRequestsView" class="view">
                 <div id="pullRequestsList" class="pull-request-list"></div>
+            </section>
+
+            <section id="mergedTodayView" class="view hidden">
+                <div class="merged-sections">
+                    <section class="merged-section">
+                        <span id="mergedTodayHumanCount" class="section-count hidden">0</span>
+                        <div id="mergedTodayList" class="pull-request-list"></div>
+                    </section>
+
+                    <section class="merged-section">
+                        <div class="section-heading">
+                            <div>
+                                <p class="eyebrow">Merged today</p>
+                                <h3>Dependabot</h3>
+                            </div>
+                            <span id="mergedTodayDependabotCount" class="section-count">0</span>
+                        </div>
+                        <div id="mergedTodayDependabotList" class="pull-request-list"></div>
+                    </section>
+                </div>
             </section>
 
             <section id="dependabotView" class="view hidden">

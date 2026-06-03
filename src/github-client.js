@@ -12,7 +12,8 @@ const GH_CANDIDATES = [
     '/usr/local/bin/gh',
     'gh'
 ].filter(Boolean);
-const PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision';
+const OPEN_PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision';
+const MERGED_PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,mergedAt,reviewDecision';
 
 function resolveGhPath() {
     return GH_CANDIDATES.find((candidate) => candidate === 'gh' || fs.existsSync(candidate)) || 'gh';
@@ -65,9 +66,22 @@ function parseJson(output, description) {
     }
 }
 
+function getLocalDateKey(value) {
+    const date = value ? new Date(value) : new Date();
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
     const normalizedConfig = validateConfig(config);
     const run = options.runGhImpl || runGh;
+    const today = options.today || getLocalDateKey();
     const repositories = parseJson(await run([
         'repo',
         'list',
@@ -81,7 +95,7 @@ async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
         'nameWithOwner'
     ]), 'repositories');
 
-    const pullRequestLists = await Promise.all(repositories.map(async ({ nameWithOwner }) => {
+    const repositoryPullRequestLists = await Promise.all(repositories.map(async ({ nameWithOwner }) => {
         const pullRequests = parseJson(await run([
             'pr',
             'list',
@@ -90,23 +104,50 @@ async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
             '--limit',
             '100',
             '--json',
-            PR_FIELDS
+            OPEN_PR_FIELDS
         ]), `pull requests for ${nameWithOwner}`);
 
-        return pullRequests.map((pullRequest) => ({
-            ...pullRequest,
-            repository: nameWithOwner
-        }));
+        const mergedPullRequests = parseJson(await run([
+            'pr',
+            'list',
+            '--repo',
+            nameWithOwner,
+            '--state',
+            'merged',
+            '--search',
+            `merged:${today}`,
+            '--limit',
+            '100',
+            '--json',
+            MERGED_PR_FIELDS
+        ]), `merged pull requests for ${nameWithOwner}`);
+
+        return {
+            pullRequests: pullRequests.map((pullRequest) => ({
+                ...pullRequest,
+                repository: nameWithOwner
+            })),
+            mergedPullRequests: mergedPullRequests.map((pullRequest) => ({
+                ...pullRequest,
+                repository: nameWithOwner
+            }))
+        };
     }));
 
-    const pullRequests = pullRequestLists
-        .flat()
+    const pullRequests = repositoryPullRequestLists
+        .flatMap(({ pullRequests }) => pullRequests)
         .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)));
+    const mergedPullRequests = repositoryPullRequestLists
+        .flatMap(({ mergedPullRequests }) => mergedPullRequests)
+        .filter((pullRequest) => getLocalDateKey(pullRequest.mergedAt) === today)
+        .sort((left, right) => String(right.mergedAt).localeCompare(String(left.mergedAt)));
 
     return {
         config: normalizedConfig,
         repositories: repositories.map(({ nameWithOwner }) => nameWithOwner),
         pullRequests: pullRequests.filter((pullRequest) => pullRequest.author?.login !== DEPENDABOT_LOGIN),
+        mergedPullRequests: mergedPullRequests.filter((pullRequest) => pullRequest.author?.login !== DEPENDABOT_LOGIN),
+        mergedDependabotPullRequests: mergedPullRequests.filter((pullRequest) => pullRequest.author?.login === DEPENDABOT_LOGIN),
         dependabotPullRequests: pullRequests
             .filter((pullRequest) => pullRequest.author?.login === DEPENDABOT_LOGIN)
             .sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt))),
@@ -118,6 +159,7 @@ module.exports = {
     DEFAULT_CONFIG,
     DEPENDABOT_LOGIN,
     fetchPullRequests,
+    getLocalDateKey,
     resolveGhPath,
     runGh,
     validateConfig

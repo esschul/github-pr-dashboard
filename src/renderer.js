@@ -19,11 +19,17 @@ const themeIcon = document.getElementById('themeIcon');
 const statusPanel = document.getElementById('statusPanel');
 const errorPanel = document.getElementById('errorPanel');
 const pullRequestsView = document.getElementById('pullRequestsView');
+const mergedTodayView = document.getElementById('mergedTodayView');
 const dependabotView = document.getElementById('dependabotView');
 const settingsView = document.getElementById('settingsView');
 const pullRequestsList = document.getElementById('pullRequestsList');
+const mergedTodayList = document.getElementById('mergedTodayList');
+const mergedTodayDependabotList = document.getElementById('mergedTodayDependabotList');
 const dependabotList = document.getElementById('dependabotList');
 const pullRequestsCount = document.getElementById('pullRequestsCount');
+const mergedTodayCount = document.getElementById('mergedTodayCount');
+const mergedTodayHumanCount = document.getElementById('mergedTodayHumanCount');
+const mergedTodayDependabotCount = document.getElementById('mergedTodayDependabotCount');
 const dependabotCount = document.getElementById('dependabotCount');
 const settingsForm = document.getElementById('settingsForm');
 const organizationInput = document.getElementById('organizationInput');
@@ -95,6 +101,16 @@ function getReviewLabel(pullRequest) {
     }[pullRequest.reviewDecision] || 'Open';
 }
 
+function getReviewStatusClass(pullRequest, statusLabel) {
+    if (statusLabel === 'Merged') return 'is-merged';
+    if (pullRequest.isDraft) return 'is-draft';
+    return {
+        APPROVED: 'is-approved',
+        CHANGES_REQUESTED: 'is-changes-requested',
+        REVIEW_REQUIRED: 'is-pending'
+    }[pullRequest.reviewDecision] || 'is-open';
+}
+
 function getAgeDetails(createdAt) {
     const createdDate = new Date(createdAt);
     if (Number.isNaN(createdDate.getTime())) {
@@ -135,12 +151,12 @@ function renderPullRequestList(element, pullRequests, emptyMessage, options = {}
                     <span>·</span>
                     <span>${escapeHtml(pullRequest.author?.login || 'Unknown author')}</span>
                     <span>·</span>
-                    <span>Updated ${escapeHtml(formatDate(pullRequest.updatedAt))}</span>
+                    <span>${escapeHtml(options.dateLabel || 'Updated')} ${escapeHtml(formatDate(pullRequest[options.dateField || 'updatedAt']))}</span>
                 </p>
             </div>
             <div class="pull-request-actions">
                 ${ageDetails ? `<span class="age-pill is-${ageDetails.level}">${escapeHtml(ageDetails.label)}</span>` : ''}
-                <span class="pill">${escapeHtml(getReviewLabel(pullRequest))}</span>
+                <span class="status-pill ${escapeHtml(getReviewStatusClass(pullRequest, options.statusLabel))}">${escapeHtml(options.statusLabel || getReviewLabel(pullRequest))}</span>
                 <button class="secondary-button" type="button" data-pull-request-url="${escapeAttribute(pullRequest.url)}">Open</button>
             </div>
         </article>
@@ -150,8 +166,21 @@ function renderPullRequestList(element, pullRequests, emptyMessage, options = {}
 
 function renderResult(result) {
     renderPullRequestList(pullRequestsList, result.pullRequests, 'No human-authored pull requests are open.');
+    renderPullRequestList(mergedTodayList, result.mergedPullRequests, 'No human-authored pull requests have been merged today.', {
+        dateField: 'mergedAt',
+        dateLabel: 'Merged',
+        statusLabel: 'Merged'
+    });
+    renderPullRequestList(mergedTodayDependabotList, result.mergedDependabotPullRequests, 'No Dependabot pull requests have been merged today.', {
+        dateField: 'mergedAt',
+        dateLabel: 'Merged',
+        statusLabel: 'Merged'
+    });
     renderPullRequestList(dependabotList, result.dependabotPullRequests, 'No Dependabot pull requests are open.', { showAge: true });
     pullRequestsCount.textContent = result.pullRequests.length;
+    mergedTodayCount.textContent = result.mergedPullRequests.length + result.mergedDependabotPullRequests.length;
+    mergedTodayHumanCount.textContent = result.mergedPullRequests.length;
+    mergedTodayDependabotCount.textContent = result.mergedDependabotPullRequests.length;
     dependabotCount.textContent = result.dependabotPullRequests.length;
     teamLabel.textContent = `${result.config.organization} / ${result.config.topic}`;
     statusPanel.textContent = `${result.repositories.length} repositories · Updated ${formatDate(result.refreshedAt)}`;
@@ -220,6 +249,7 @@ async function refresh() {
 function setView(view) {
     activeView = view;
     pullRequestsView.classList.toggle('hidden', view !== 'pull-requests');
+    mergedTodayView.classList.toggle('hidden', view !== 'merged-today');
     dependabotView.classList.toggle('hidden', view !== 'dependabot');
     settingsView.classList.toggle('hidden', view !== 'settings');
     refreshButton.classList.toggle('hidden', view === 'settings');
@@ -227,6 +257,7 @@ function setView(view) {
 
     const labels = {
         'pull-requests': ['Team queue', 'Pull requests'],
+        'merged-today': ['Completed today', 'Merged today'],
         dependabot: ['Dependency updates', 'Dependabot'],
         settings: ['Dashboard', 'Settings']
     };
