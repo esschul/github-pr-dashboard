@@ -4,13 +4,17 @@ const STORAGE_KEYS = {
     config: 'github-pr-dashboard:config',
     mentionsSeen: 'github-pr-dashboard:mentions-seen',
     seenPullRequests: 'github-pr-dashboard:seen-pull-requests',
+    sidebarCollapsed: 'github-pr-dashboard:sidebar-collapsed',
     theme: 'github-pr-dashboard:theme'
 };
+const appShell = document.querySelector('.app-shell');
 const navItems = Array.from(document.querySelectorAll('.nav-item[data-view]'));
 const teamLabel = document.getElementById('teamLabel');
 const viewEyebrow = document.getElementById('viewEyebrow');
 const viewTitle = document.getElementById('viewTitle');
 const refreshButton = document.getElementById('refreshButton');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
 const themeButton = document.getElementById('themeButton');
 const themeIcon = document.getElementById('themeIcon');
 const statusPanel = document.getElementById('statusPanel');
@@ -206,6 +210,43 @@ function renderPullRequestList(element, pullRequests, emptyMessage, options = {}
     }).join('');
 }
 
+function renderDependabotPullRequests(pullRequests) {
+    const failingPullRequests = pullRequests.filter((pullRequest) => pullRequest.checkStatus === 'failure');
+    const otherPullRequests = pullRequests.filter((pullRequest) => pullRequest.checkStatus !== 'failure');
+
+    if (!failingPullRequests.length) {
+        renderPullRequestList(dependabotList, pullRequests, 'No Dependabot pull requests are open.', { showAge: true });
+        return;
+    }
+
+    dependabotList.innerHTML = `
+        <div class="dependabot-sections">
+            <section class="dependabot-section">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Dependabot</p>
+                        <h3>Failing checks</h3>
+                    </div>
+                </div>
+                <div id="dependabotFailingList" class="pull-request-list"></div>
+            </section>
+
+            <section class="dependabot-section">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Dependabot</p>
+                        <h3>Other updates</h3>
+                    </div>
+                </div>
+                <div id="dependabotOtherList" class="pull-request-list"></div>
+            </section>
+        </div>
+    `;
+
+    renderPullRequestList(document.getElementById('dependabotFailingList'), failingPullRequests, 'No Dependabot pull requests have failing checks.', { showAge: true });
+    renderPullRequestList(document.getElementById('dependabotOtherList'), otherPullRequests, 'No other Dependabot pull requests are open.', { showAge: true });
+}
+
 function renderResult(result) {
     markNewCommentActivity(result);
     renderPullRequestList(pullRequestsList, result.pullRequests, 'No human-authored pull requests are open.');
@@ -219,7 +260,7 @@ function renderResult(result) {
         dateLabel: 'Merged',
         statusLabel: 'Merged'
     });
-    renderPullRequestList(dependabotList, result.dependabotPullRequests, 'No Dependabot pull requests are open.', { showAge: true });
+    renderDependabotPullRequests(result.dependabotPullRequests);
     pullRequestsCount.textContent = result.pullRequests.length;
     mergedTodayCount.textContent = result.mergedPullRequests.length + result.mergedDependabotPullRequests.length;
     dependabotCount.textContent = result.dependabotPullRequests.length;
@@ -401,6 +442,14 @@ function applyTheme(theme) {
     themeButton.title = nextThemeLabel;
 }
 
+function applySidebarCollapsed(isCollapsed) {
+    appShell.classList.toggle('is-sidebar-collapsed', isCollapsed);
+    window.localStorage.setItem(STORAGE_KEYS.sidebarCollapsed, String(isCollapsed));
+    sidebarToggleIcon.textContent = isCollapsed ? '›' : '‹';
+    sidebarToggle.setAttribute('aria-label', isCollapsed ? 'Expand menu' : 'Collapse menu');
+    sidebarToggle.title = isCollapsed ? 'Expand menu' : 'Collapse menu';
+}
+
 navItems.forEach((item) => {
     item.addEventListener('click', () => setView(item.dataset.view));
 });
@@ -408,6 +457,9 @@ navItems.forEach((item) => {
 refreshButton.addEventListener('click', refresh);
 themeButton.addEventListener('click', () => {
     applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+});
+sidebarToggle.addEventListener('click', () => {
+    applySidebarCollapsed(!appShell.classList.contains('is-sidebar-collapsed'));
 });
 
 settingsForm.addEventListener('submit', (event) => {
@@ -441,6 +493,7 @@ teamLabel.textContent = hasCompleteConfig(initialConfig)
     ? `${initialConfig.organization} / ${initialConfig.topic}`
     : 'No team configured';
 applyTheme(window.localStorage.getItem(STORAGE_KEYS.theme));
+applySidebarCollapsed(window.localStorage.getItem(STORAGE_KEYS.sidebarCollapsed) === 'true');
 if (hasCompleteConfig(initialConfig)) {
     setView(activeView);
     refresh();
