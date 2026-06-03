@@ -1,20 +1,22 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { fetchPullRequests, getLocalDateKey, validateConfig } = require('../src/github-client');
+const { fetchPullRequests, getLatestCommentActivity, getLocalDateKey, validateConfig } = require('../src/github-client');
 
 test('fetchPullRequests separates human and Dependabot pull requests', async () => {
     const responses = new Map([
         ['repo list bring --topic checkout --no-archived --limit 100 --json nameWithOwner', JSON.stringify([
             { nameWithOwner: 'bring/checkout-api' }
         ])],
-        ['pr list --repo bring/checkout-api --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision', JSON.stringify([
+        ['pr list --repo bring/checkout-api --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision,comments,reviews', JSON.stringify([
             {
                 number: 2,
                 title: 'Dependency update',
                 url: 'https://github.com/bring/checkout-api/pull/2',
                 author: { login: 'app/dependabot' },
                 createdAt: '2026-05-02T12:00:00Z',
-                updatedAt: '2026-06-02T12:00:00Z'
+                updatedAt: '2026-06-02T12:00:00Z',
+                comments: [],
+                reviews: []
             },
             {
                 number: 3,
@@ -22,7 +24,9 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 url: 'https://github.com/bring/checkout-api/pull/3',
                 author: { login: 'app/dependabot' },
                 createdAt: '2026-06-01T12:00:00Z',
-                updatedAt: '2026-06-02T13:00:00Z'
+                updatedAt: '2026-06-02T13:00:00Z',
+                comments: [],
+                reviews: []
             },
             {
                 number: 1,
@@ -30,7 +34,14 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
                 url: 'https://github.com/bring/checkout-api/pull/1',
                 author: { login: 'developer' },
                 createdAt: '2026-06-01T12:00:00Z',
-                updatedAt: '2026-06-01T12:00:00Z'
+                updatedAt: '2026-06-01T12:00:00Z',
+                comments: [
+                    { createdAt: '2026-06-01T13:00:00Z', updatedAt: '2026-06-01T13:00:00Z' }
+                ],
+                reviews: [
+                    { body: '', submittedAt: '2026-06-01T14:00:00Z' },
+                    { body: 'Looks good', submittedAt: '2026-06-01T15:00:00Z' }
+                ]
             }
         ])],
         ['pr list --repo bring/checkout-api --state merged --search merged:2026-06-03 --limit 100 --json number,title,url,author,isDraft,createdAt,updatedAt,mergedAt,reviewDecision', JSON.stringify([
@@ -71,9 +82,24 @@ test('fetchPullRequests separates human and Dependabot pull requests', async () 
 
     assert.deepEqual(result.repositories, ['bring/checkout-api']);
     assert.deepEqual(result.pullRequests.map(({ number }) => number), [1]);
+    assert.equal(result.pullRequests[0].commentActivityAt, '2026-06-01T15:00:00Z');
+    assert.equal(result.pullRequests[0].commentActivityCount, 2);
     assert.deepEqual(result.mergedPullRequests.map(({ number }) => number), [4]);
     assert.deepEqual(result.mergedDependabotPullRequests.map(({ number }) => number), [5]);
     assert.deepEqual(result.dependabotPullRequests.map(({ number }) => number), [2, 3]);
+});
+
+test('getLatestCommentActivity ignores reviews without a body', () => {
+    assert.deepEqual(getLatestCommentActivity({
+        comments: [{ createdAt: '2026-06-03T08:00:00Z' }],
+        reviews: [
+            { body: '', submittedAt: '2026-06-03T09:00:00Z' },
+            { body: 'Needs a change', submittedAt: '2026-06-03T10:00:00Z' }
+        ]
+    }), {
+        commentActivityAt: '2026-06-03T10:00:00Z',
+        commentActivityCount: 2
+    });
 });
 
 test('getLocalDateKey formats a date as YYYY-MM-DD', () => {

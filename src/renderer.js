@@ -1,5 +1,6 @@
 const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
 const STORAGE_KEYS = {
+    commentActivitySeen: 'github-pr-dashboard:comment-activity-seen',
     config: 'github-pr-dashboard:config',
     seenPullRequests: 'github-pr-dashboard:seen-pull-requests',
     theme: 'github-pr-dashboard:theme'
@@ -32,6 +33,7 @@ const topicInput = document.getElementById('topicInput');
 
 let activeView = 'pull-requests';
 let refreshInProgress = false;
+let latestPullRequestsByUrl = new Map();
 
 function readStoredJson(key, fallback) {
     try {
@@ -47,6 +49,17 @@ function getConfig() {
 
 function saveConfig(config) {
     window.localStorage.setItem(STORAGE_KEYS.config, JSON.stringify(config));
+}
+
+function getSeenCommentActivityState(config) {
+    const states = readStoredJson(STORAGE_KEYS.commentActivitySeen, {});
+    return states[getTeamKey(config)] || {};
+}
+
+function saveSeenCommentActivityState(config, state) {
+    const states = readStoredJson(STORAGE_KEYS.commentActivitySeen, {});
+    states[getTeamKey(config)] = state;
+    window.localStorage.setItem(STORAGE_KEYS.commentActivitySeen, JSON.stringify(states));
 }
 
 function getTeamKey(config) {
@@ -150,6 +163,7 @@ function renderPullRequestList(element, pullRequests, emptyMessage, options = {}
                 </p>
             </div>
             <div class="pull-request-actions">
+                ${pullRequest.hasNewComments ? '<span class="comment-pill">New comments</span>' : ''}
                 ${ageDetails ? `<span class="age-pill is-${ageDetails.level}">${escapeHtml(ageDetails.label)}</span>` : ''}
                 <span class="status-pill ${escapeHtml(getReviewStatusClass(pullRequest, options.statusLabel))}">${escapeHtml(options.statusLabel || getReviewLabel(pullRequest))}</span>
                 <button class="secondary-button" type="button" data-pull-request-url="${escapeAttribute(pullRequest.url)}">Open</button>
@@ -160,6 +174,7 @@ function renderPullRequestList(element, pullRequests, emptyMessage, options = {}
 }
 
 function renderResult(result) {
+    markNewCommentActivity(result);
     renderPullRequestList(pullRequestsList, result.pullRequests, 'No human-authored pull requests are open.');
     renderPullRequestList(mergedTodayList, result.mergedPullRequests, 'No human-authored pull requests have been merged today.', {
         dateField: 'mergedAt',
@@ -175,6 +190,50 @@ function renderResult(result) {
     teamLabel.textContent = `${result.config.organization} / ${result.config.topic}`;
     statusPanel.textContent = `${result.repositories.length} repositories · Updated ${formatDate(result.refreshedAt)}`;
 }
+
+function markNewCommentActivity(result) {
+    const seenActivity = getSeenCommentActivityState(result.config);
+    const nextSeenActivity = { ...seenActivity };
+    const pullRequests = [
+        ...(result.pullRequests || []),
+        ...(result.dependabotPullRequests || [])
+    ];
+    latestPullRequestsByUrl = new Map(pullRequests.map((pullRequest) => [pullRequest.url, pullRequest]));
+
+    pullRequests.forEach((pullRequest) => {
+        if (!pullRequest.commentActivityAt) {
+            pullRequest.hasNewComments = false;
+            return;
+        }
+
+        const previousActivityAt = seenActivity[pullRequest.url];
+        pullRequest.hasNewComments = Boolean(previousActivityAt && pullRequest.commentActivityAt > previousActivityAt);
+        if (!pullRequest.hasNewComments) {
+            nextSeenActivity[pullRequest.url] = pullRequest.commentActivityAt;
+        }
+    });
+
+    saveSeenCommentActivityState(result.config, nextSeenActivity);
+}
+
+function markCommentActivitySeen(url) {
+    const pullRequest = latestPullRequestsByUrl.get(url);
+    if (!pullRequest?.commentActivityAt) {
+        return;
+    }
+
+    const config = getConfig();
+    const seenActivity = getSeenCommentActivityState(config);
+    seenActivity[url] = pullRequest.commentActivityAt;
+    saveSeenCommentActivityState(config, seenActivity);
+    pullRequest.hasNewComments = false;
+
+    const button = document.querySelector(`[data-pull-request-url="${CSS.escape(url)}"]`);
+    const card = button?.closest('.pull-request-card');
+    card?.querySelector('.comment-pill')?.remove();
+}
+
+
 
 async function notifyAboutNewPullRequests(config, pullRequests) {
     const seenState = getSeenPullRequestState(config);
@@ -288,6 +347,7 @@ settingsForm.addEventListener('submit', (event) => {
 document.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-pull-request-url]');
     if (button) {
+        markCommentActivitySeen(button.dataset.pullRequestUrl);
         await window.githubDashboard.openExternal(button.dataset.pullRequestUrl);
     }
 });

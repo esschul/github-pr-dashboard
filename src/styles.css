@@ -202,6 +202,23 @@ h3 {
     white-space: nowrap;
 }
 
+.comment-pill {
+    padding: 4px 8px;
+    border: 1px solid #8b5cf6;
+    border-radius: 999px;
+    background: #f3e8ff;
+    color: #6d28d9;
+    font-size: 0.78rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+:root[data-theme="dark"] .comment-pill {
+    border-color: #a78bfa;
+    background: #3b285e;
+    color: #ddd6fe;
+}
+
 .age-pill.is-fresh {
     background: #e8f6ed;
     color: #237441;

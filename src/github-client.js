@@ -12,7 +12,7 @@ const GH_CANDIDATES = [
     '/usr/local/bin/gh',
     'gh'
 ].filter(Boolean);
-const OPEN_PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision';
+const OPEN_PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,reviewDecision,comments,reviews';
 const MERGED_PR_FIELDS = 'number,title,url,author,isDraft,createdAt,updatedAt,mergedAt,reviewDecision';
 
 function resolveGhPath() {
@@ -78,6 +78,35 @@ function getLocalDateKey(value) {
     return `${year}-${month}-${day}`;
 }
 
+function getLatestCommentActivity(pullRequest) {
+    const commentTimestamps = [
+        ...(pullRequest.comments || []).map((comment) => comment.updatedAt || comment.createdAt),
+        ...(pullRequest.reviews || [])
+            .filter((review) => String(review.body || '').trim())
+            .map((review) => review.submittedAt || review.updatedAt || review.createdAt)
+    ].filter(Boolean);
+
+    if (!commentTimestamps.length) {
+        return {
+            commentActivityAt: null,
+            commentActivityCount: 0
+        };
+    }
+
+    return {
+        commentActivityAt: commentTimestamps.sort().at(-1),
+        commentActivityCount: commentTimestamps.length
+    };
+}
+
+function normalizePullRequest(pullRequest, repository) {
+    return {
+        ...pullRequest,
+        ...getLatestCommentActivity(pullRequest),
+        repository
+    };
+}
+
 async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
     const normalizedConfig = validateConfig(config);
     const run = options.runGhImpl || runGh;
@@ -123,10 +152,7 @@ async function fetchPullRequests(config = DEFAULT_CONFIG, options = {}) {
         ]), `merged pull requests for ${nameWithOwner}`);
 
         return {
-            pullRequests: pullRequests.map((pullRequest) => ({
-                ...pullRequest,
-                repository: nameWithOwner
-            })),
+            pullRequests: pullRequests.map((pullRequest) => normalizePullRequest(pullRequest, nameWithOwner)),
             mergedPullRequests: mergedPullRequests.map((pullRequest) => ({
                 ...pullRequest,
                 repository: nameWithOwner
@@ -159,6 +185,7 @@ module.exports = {
     DEFAULT_CONFIG,
     DEPENDABOT_LOGIN,
     fetchPullRequests,
+    getLatestCommentActivity,
     getLocalDateKey,
     resolveGhPath,
     runGh,
