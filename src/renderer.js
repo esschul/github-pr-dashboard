@@ -2,11 +2,22 @@ const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
 const STORAGE_KEYS = {
     commentActivitySeen: 'github-pr-dashboard:comment-activity-seen',
     config: 'github-pr-dashboard:config',
+    dependabotPullRequestFilter: 'github-pr-dashboard:dependabot-pull-request-filter',
+    humanPullRequestFilter: 'github-pr-dashboard:human-pull-request-filter',
     mentionsSeen: 'github-pr-dashboard:mentions-seen',
     seenPullRequests: 'github-pr-dashboard:seen-pull-requests',
     sidebarCollapsed: 'github-pr-dashboard:sidebar-collapsed',
     theme: 'github-pr-dashboard:theme'
 };
+const PULL_REQUEST_FILTERS = [
+    'all',
+    'approved',
+    'pending',
+    'changes-requested',
+    'draft',
+    'checks-failing',
+    'checks-pending'
+];
 const appShell = document.querySelector('.app-shell');
 const navItems = Array.from(document.querySelectorAll('.nav-item[data-view]'));
 const teamLabel = document.getElementById('teamLabel');
@@ -24,6 +35,22 @@ const mergedTodayView = document.getElementById('mergedTodayView');
 const dependabotView = document.getElementById('dependabotView');
 const settingsView = document.getElementById('settingsView');
 const pullRequestsList = document.getElementById('pullRequestsList');
+const pullRequestFilterButtons = Array.from(document.querySelectorAll('#pullRequestFilters .filter-chip'));
+const filterCountAll = document.getElementById('filterCountAll');
+const filterCountApproved = document.getElementById('filterCountApproved');
+const filterCountPending = document.getElementById('filterCountPending');
+const filterCountChangesRequested = document.getElementById('filterCountChangesRequested');
+const filterCountDraft = document.getElementById('filterCountDraft');
+const filterCountChecksFailing = document.getElementById('filterCountChecksFailing');
+const filterCountChecksPending = document.getElementById('filterCountChecksPending');
+const dependabotFilterButtons = Array.from(document.querySelectorAll('#dependabotFilters .filter-chip'));
+const dependabotFilterCountAll = document.getElementById('dependabotFilterCountAll');
+const dependabotFilterCountApproved = document.getElementById('dependabotFilterCountApproved');
+const dependabotFilterCountPending = document.getElementById('dependabotFilterCountPending');
+const dependabotFilterCountChangesRequested = document.getElementById('dependabotFilterCountChangesRequested');
+const dependabotFilterCountDraft = document.getElementById('dependabotFilterCountDraft');
+const dependabotFilterCountChecksFailing = document.getElementById('dependabotFilterCountChecksFailing');
+const dependabotFilterCountChecksPending = document.getElementById('dependabotFilterCountChecksPending');
 const mergedTodayList = document.getElementById('mergedTodayList');
 const mergedTodayDependabotList = document.getElementById('mergedTodayDependabotList');
 const dependabotList = document.getElementById('dependabotList');
@@ -35,7 +62,11 @@ const organizationInput = document.getElementById('organizationInput');
 const topicInput = document.getElementById('topicInput');
 
 let activeView = 'pull-requests';
+let activeHumanPullRequestFilter = getStoredPullRequestFilter(STORAGE_KEYS.humanPullRequestFilter);
+let activeDependabotPullRequestFilter = getStoredPullRequestFilter(STORAGE_KEYS.dependabotPullRequestFilter);
 let refreshInProgress = false;
+let latestHumanPullRequests = [];
+let latestDependabotPullRequests = [];
 let latestPullRequestsByUrl = new Map();
 
 function readStoredJson(key, fallback) {
@@ -155,6 +186,82 @@ function getCheckStatusClass(pullRequest) {
     }[pullRequest.checkStatus] || 'is-none';
 }
 
+function matchesPullRequestFilter(pullRequest, filter) {
+    if (filter === 'approved') {
+        return pullRequest.reviewDecision === 'APPROVED' && !pullRequest.isDraft;
+    }
+    if (filter === 'pending') {
+        return !pullRequest.isDraft && pullRequest.reviewDecision !== 'APPROVED' && pullRequest.reviewDecision !== 'CHANGES_REQUESTED';
+    }
+    if (filter === 'changes-requested') {
+        return pullRequest.reviewDecision === 'CHANGES_REQUESTED' && !pullRequest.isDraft;
+    }
+    if (filter === 'draft') {
+        return Boolean(pullRequest.isDraft);
+    }
+    if (filter === 'checks-failing') {
+        return pullRequest.checkStatus === 'failure';
+    }
+    if (filter === 'checks-pending') {
+        return pullRequest.checkStatus === 'pending';
+    }
+    return true;
+}
+
+function getStoredPullRequestFilter(storageKey) {
+    const storedFilter = window.localStorage.getItem(storageKey);
+    return PULL_REQUEST_FILTERS.includes(storedFilter) ? storedFilter : 'all';
+}
+
+function getFilteredHumanPullRequests() {
+    return latestHumanPullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, activeHumanPullRequestFilter));
+}
+
+function getFilteredDependabotPullRequests() {
+    return latestDependabotPullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, activeDependabotPullRequestFilter));
+}
+
+function updatePullRequestFilterCounts(pullRequests, elements) {
+    elements.all.textContent = pullRequests.length;
+    elements.approved.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'approved')).length;
+    elements.pending.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'pending')).length;
+    elements.changesRequested.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'changes-requested')).length;
+    elements.draft.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'draft')).length;
+    elements.checksFailing.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'checks-failing')).length;
+    elements.checksPending.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'checks-pending')).length;
+}
+
+function applyHumanPullRequestFilter(filter) {
+    activeHumanPullRequestFilter = PULL_REQUEST_FILTERS.includes(filter) ? filter : 'all';
+    window.localStorage.setItem(STORAGE_KEYS.humanPullRequestFilter, activeHumanPullRequestFilter);
+    pullRequestFilterButtons.forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.filter === activeHumanPullRequestFilter);
+    });
+    renderPullRequestList(
+        pullRequestsList,
+        getFilteredHumanPullRequests(),
+        activeHumanPullRequestFilter === 'all'
+            ? 'No human-authored pull requests are open.'
+            : 'No human-authored pull requests match this filter.'
+    );
+}
+
+function applyDependabotPullRequestFilter(filter) {
+    activeDependabotPullRequestFilter = PULL_REQUEST_FILTERS.includes(filter) ? filter : 'all';
+    window.localStorage.setItem(STORAGE_KEYS.dependabotPullRequestFilter, activeDependabotPullRequestFilter);
+    dependabotFilterButtons.forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.filter === activeDependabotPullRequestFilter);
+    });
+    renderPullRequestList(
+        dependabotList,
+        getFilteredDependabotPullRequests(),
+        activeDependabotPullRequestFilter === 'all'
+            ? 'No Dependabot pull requests are open.'
+            : 'No Dependabot pull requests match this filter.',
+        { showAge: true }
+    );
+}
+
 function getAgeDetails(createdAt) {
     const createdDate = new Date(createdAt);
     if (Number.isNaN(createdDate.getTime())) {
@@ -210,46 +317,29 @@ function renderPullRequestList(element, pullRequests, emptyMessage, options = {}
     }).join('');
 }
 
-function renderDependabotPullRequests(pullRequests) {
-    const failingPullRequests = pullRequests.filter((pullRequest) => pullRequest.checkStatus === 'failure');
-    const otherPullRequests = pullRequests.filter((pullRequest) => pullRequest.checkStatus !== 'failure');
-
-    if (!failingPullRequests.length) {
-        renderPullRequestList(dependabotList, pullRequests, 'No Dependabot pull requests are open.', { showAge: true });
-        return;
-    }
-
-    dependabotList.innerHTML = `
-        <div class="dependabot-sections">
-            <section class="dependabot-section">
-                <div class="section-heading">
-                    <div>
-                        <p class="eyebrow">Dependabot</p>
-                        <h3>Failing checks</h3>
-                    </div>
-                </div>
-                <div id="dependabotFailingList" class="pull-request-list"></div>
-            </section>
-
-            <section class="dependabot-section">
-                <div class="section-heading">
-                    <div>
-                        <p class="eyebrow">Dependabot</p>
-                        <h3>Other updates</h3>
-                    </div>
-                </div>
-                <div id="dependabotOtherList" class="pull-request-list"></div>
-            </section>
-        </div>
-    `;
-
-    renderPullRequestList(document.getElementById('dependabotFailingList'), failingPullRequests, 'No Dependabot pull requests have failing checks.', { showAge: true });
-    renderPullRequestList(document.getElementById('dependabotOtherList'), otherPullRequests, 'No other Dependabot pull requests are open.', { showAge: true });
-}
-
 function renderResult(result) {
     markNewCommentActivity(result);
-    renderPullRequestList(pullRequestsList, result.pullRequests, 'No human-authored pull requests are open.');
+    latestHumanPullRequests = result.pullRequests;
+    latestDependabotPullRequests = result.dependabotPullRequests;
+    updatePullRequestFilterCounts(latestHumanPullRequests, {
+        all: filterCountAll,
+        approved: filterCountApproved,
+        pending: filterCountPending,
+        changesRequested: filterCountChangesRequested,
+        draft: filterCountDraft,
+        checksFailing: filterCountChecksFailing,
+        checksPending: filterCountChecksPending
+    });
+    updatePullRequestFilterCounts(latestDependabotPullRequests, {
+        all: dependabotFilterCountAll,
+        approved: dependabotFilterCountApproved,
+        pending: dependabotFilterCountPending,
+        changesRequested: dependabotFilterCountChangesRequested,
+        draft: dependabotFilterCountDraft,
+        checksFailing: dependabotFilterCountChecksFailing,
+        checksPending: dependabotFilterCountChecksPending
+    });
+    applyHumanPullRequestFilter(activeHumanPullRequestFilter);
     renderPullRequestList(mergedTodayList, result.mergedPullRequests, 'No human-authored pull requests have been merged today.', {
         dateField: 'mergedAt',
         dateLabel: 'Merged',
@@ -260,7 +350,7 @@ function renderResult(result) {
         dateLabel: 'Merged',
         statusLabel: 'Merged'
     });
-    renderDependabotPullRequests(result.dependabotPullRequests);
+    applyDependabotPullRequestFilter(activeDependabotPullRequestFilter);
     pullRequestsCount.textContent = result.pullRequests.length;
     mergedTodayCount.textContent = result.mergedPullRequests.length + result.mergedDependabotPullRequests.length;
     dependabotCount.textContent = result.dependabotPullRequests.length;
@@ -460,6 +550,12 @@ themeButton.addEventListener('click', () => {
 });
 sidebarToggle.addEventListener('click', () => {
     applySidebarCollapsed(!appShell.classList.contains('is-sidebar-collapsed'));
+});
+pullRequestFilterButtons.forEach((button) => {
+    button.addEventListener('click', () => applyHumanPullRequestFilter(button.dataset.filter));
+});
+dependabotFilterButtons.forEach((button) => {
+    button.addEventListener('click', () => applyDependabotPullRequestFilter(button.dataset.filter));
 });
 
 settingsForm.addEventListener('submit', (event) => {

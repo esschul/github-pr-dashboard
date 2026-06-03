@@ -399,6 +399,57 @@ h3 {
     padding-right: 6px;
 }
 
+#pullRequestsView,
+#dependabotView {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#pullRequestsView.hidden,
+#dependabotView.hidden {
+    display: none;
+}
+
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--text);
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.filter-chip:hover {
+    background: var(--panel-muted);
+}
+
+.filter-chip.is-active {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+}
+
+:root[data-theme="dark"] .filter-chip.is-active {
+    color: #102033;
+}
+
+.filter-chip span {
+    color: inherit;
+    opacity: 0.76;
+}
+
 .merged-sections {
     display: grid;
     min-height: 0;
@@ -408,20 +459,6 @@ h3 {
 }
 
 .merged-section {
-    display: flex;
-    min-height: 0;
-    flex-direction: column;
-}
-
-.dependabot-sections {
-    display: grid;
-    min-height: 0;
-    height: 100%;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 22px;
-}
-
-.dependabot-section {
     display: flex;
     min-height: 0;
     flex-direction: column;
