@@ -65,8 +65,8 @@ const organizationInput = document.getElementById('organizationInput');
 const topicInput = document.getElementById('topicInput');
 
 let activeView = 'pull-requests';
-let activeHumanPullRequestFilter = getStoredPullRequestFilter(STORAGE_KEYS.humanPullRequestFilter, PULL_REQUEST_FILTERS);
-let activeDependabotPullRequestFilter = getStoredPullRequestFilter(STORAGE_KEYS.dependabotPullRequestFilter, DEPENDABOT_PULL_REQUEST_FILTERS);
+let activeHumanPullRequestFilters = getStoredPullRequestFilters(STORAGE_KEYS.humanPullRequestFilter, PULL_REQUEST_FILTERS);
+let activeDependabotPullRequestFilters = getStoredPullRequestFilters(STORAGE_KEYS.dependabotPullRequestFilter, DEPENDABOT_PULL_REQUEST_FILTERS);
 let refreshInProgress = false;
 let latestHumanPullRequests = [];
 let latestDependabotPullRequests = [];
@@ -232,17 +232,23 @@ function matchesPullRequestFilter(pullRequest, filter) {
     return true;
 }
 
-function getStoredPullRequestFilter(storageKey, availableFilters) {
-    const storedFilter = window.localStorage.getItem(storageKey);
-    return availableFilters.includes(storedFilter) ? storedFilter : 'all';
+function getStoredPullRequestFilters(storageKey, availableFilters) {
+    const storedValue = readStoredJson(storageKey, window.localStorage.getItem(storageKey));
+    const storedFilters = Array.isArray(storedValue) ? storedValue : [storedValue];
+    const filters = storedFilters.filter((filter) => filter !== 'all' && availableFilters.includes(filter));
+    return filters.length ? filters : ['all'];
 }
 
 function getFilteredHumanPullRequests() {
-    return latestHumanPullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, activeHumanPullRequestFilter));
+    return latestHumanPullRequests.filter((pullRequest) => matchesPullRequestFilters(pullRequest, activeHumanPullRequestFilters));
 }
 
 function getFilteredDependabotPullRequests() {
-    return latestDependabotPullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, activeDependabotPullRequestFilter));
+    return latestDependabotPullRequests.filter((pullRequest) => matchesPullRequestFilters(pullRequest, activeDependabotPullRequestFilters));
+}
+
+function matchesPullRequestFilters(pullRequest, filters) {
+    return filters.includes('all') || filters.every((filter) => matchesPullRequestFilter(pullRequest, filter));
 }
 
 function updatePullRequestFilterCounts(pullRequests, elements) {
@@ -273,35 +279,58 @@ function updatePullRequestFilterCounts(pullRequests, elements) {
     }
 }
 
-function applyHumanPullRequestFilter(filter) {
-    activeHumanPullRequestFilter = PULL_REQUEST_FILTERS.includes(filter) ? filter : 'all';
-    window.localStorage.setItem(STORAGE_KEYS.humanPullRequestFilter, activeHumanPullRequestFilter);
+function updateActiveFilters(currentFilters, clickedFilter, availableFilters) {
+    if (clickedFilter === 'all' || !availableFilters.includes(clickedFilter)) {
+        return ['all'];
+    }
+
+    const filters = new Set(currentFilters.filter((filter) => filter !== 'all'));
+    if (filters.has(clickedFilter)) {
+        filters.delete(clickedFilter);
+    } else {
+        filters.add(clickedFilter);
+    }
+
+    return filters.size ? Array.from(filters) : ['all'];
+}
+
+function renderHumanPullRequestFilter() {
+    window.localStorage.setItem(STORAGE_KEYS.humanPullRequestFilter, JSON.stringify(activeHumanPullRequestFilters));
     pullRequestFilterButtons.forEach((button) => {
-        button.classList.toggle('is-active', button.dataset.filter === activeHumanPullRequestFilter);
+        button.classList.toggle('is-active', activeHumanPullRequestFilters.includes(button.dataset.filter));
     });
     renderPullRequestList(
         pullRequestsList,
         getFilteredHumanPullRequests(),
-        activeHumanPullRequestFilter === 'all'
+        activeHumanPullRequestFilters.includes('all')
             ? 'No human-authored pull requests are open.'
             : 'No human-authored pull requests match this filter.'
     );
 }
 
-function applyDependabotPullRequestFilter(filter) {
-    activeDependabotPullRequestFilter = DEPENDABOT_PULL_REQUEST_FILTERS.includes(filter) ? filter : 'all';
-    window.localStorage.setItem(STORAGE_KEYS.dependabotPullRequestFilter, activeDependabotPullRequestFilter);
+function renderDependabotPullRequestFilter() {
+    window.localStorage.setItem(STORAGE_KEYS.dependabotPullRequestFilter, JSON.stringify(activeDependabotPullRequestFilters));
     dependabotFilterButtons.forEach((button) => {
-        button.classList.toggle('is-active', button.dataset.filter === activeDependabotPullRequestFilter);
+        button.classList.toggle('is-active', activeDependabotPullRequestFilters.includes(button.dataset.filter));
     });
     renderPullRequestList(
         dependabotList,
         getFilteredDependabotPullRequests(),
-        activeDependabotPullRequestFilter === 'all'
+        activeDependabotPullRequestFilters.includes('all')
             ? 'No Dependabot pull requests are open.'
             : 'No Dependabot pull requests match this filter.',
         { showAge: true }
     );
+}
+
+function toggleHumanPullRequestFilter(filter) {
+    activeHumanPullRequestFilters = updateActiveFilters(activeHumanPullRequestFilters, filter, PULL_REQUEST_FILTERS);
+    renderHumanPullRequestFilter();
+}
+
+function toggleDependabotPullRequestFilter(filter) {
+    activeDependabotPullRequestFilters = updateActiveFilters(activeDependabotPullRequestFilters, filter, DEPENDABOT_PULL_REQUEST_FILTERS);
+    renderDependabotPullRequestFilter();
 }
 
 function getAgeDetails(createdAt) {
@@ -378,7 +407,7 @@ function renderResult(result) {
         checksFailing: dependabotFilterCountChecksFailing,
         checksPassed: dependabotFilterCountChecksPassed
     });
-    applyHumanPullRequestFilter(activeHumanPullRequestFilter);
+    renderHumanPullRequestFilter();
     renderPullRequestList(mergedTodayList, result.mergedPullRequests, 'No human-authored pull requests have been merged today.', {
         dateField: 'mergedAt',
         dateLabel: 'Merged',
@@ -389,7 +418,7 @@ function renderResult(result) {
         dateLabel: 'Merged',
         statusLabel: 'Merged'
     });
-    applyDependabotPullRequestFilter(activeDependabotPullRequestFilter);
+    renderDependabotPullRequestFilter();
     pullRequestsCount.textContent = result.pullRequests.length;
     mergedTodayCount.textContent = result.mergedPullRequests.length + result.mergedDependabotPullRequests.length;
     dependabotCount.textContent = result.dependabotPullRequests.length;
@@ -591,10 +620,10 @@ sidebarToggle.addEventListener('click', () => {
     applySidebarCollapsed(!appShell.classList.contains('is-sidebar-collapsed'));
 });
 pullRequestFilterButtons.forEach((button) => {
-    button.addEventListener('click', () => applyHumanPullRequestFilter(button.dataset.filter));
+    button.addEventListener('click', () => toggleHumanPullRequestFilter(button.dataset.filter));
 });
 dependabotFilterButtons.forEach((button) => {
-    button.addEventListener('click', () => applyDependabotPullRequestFilter(button.dataset.filter));
+    button.addEventListener('click', () => toggleDependabotPullRequestFilter(button.dataset.filter));
 });
 
 settingsForm.addEventListener('submit', (event) => {
