@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
 };
 const PULL_REQUEST_FILTERS = [
     'all',
+    'opened-today',
     'approved',
     'pending',
     'changes-requested',
@@ -42,6 +43,7 @@ const settingsView = document.getElementById('settingsView');
 const pullRequestsList = document.getElementById('pullRequestsList');
 const pullRequestFilterButtons = Array.from(document.querySelectorAll('#pullRequestFilters .filter-chip'));
 const filterCountAll = document.getElementById('filterCountAll');
+const filterCountOpenedToday = document.getElementById('filterCountOpenedToday');
 const filterCountApproved = document.getElementById('filterCountApproved');
 const filterCountPending = document.getElementById('filterCountPending');
 const filterCountChangesRequested = document.getElementById('filterCountChangesRequested');
@@ -153,6 +155,17 @@ function formatDate(value) {
         : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
+function getLocalDateKey(value) {
+    const date = value ? new Date(value) : new Date();
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function getReviewLabel(pullRequest) {
     if (pullRequest.isDraft) {
         return 'Draft';
@@ -192,6 +205,9 @@ function hasCheckStatus(pullRequest, status, label) {
 }
 
 function matchesPullRequestFilter(pullRequest, filter) {
+    if (filter === 'opened-today') {
+        return getLocalDateKey(pullRequest.createdAt) === getLocalDateKey();
+    }
     if (filter === 'approved') {
         return pullRequest.reviewDecision === 'APPROVED' && !pullRequest.isDraft;
     }
@@ -231,6 +247,9 @@ function getFilteredDependabotPullRequests() {
 
 function updatePullRequestFilterCounts(pullRequests, elements) {
     elements.all.textContent = pullRequests.length;
+    if (elements.openedToday) {
+        elements.openedToday.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'opened-today')).length;
+    }
     if (elements.approved) {
         elements.approved.textContent = pullRequests.filter((pullRequest) => matchesPullRequestFilter(pullRequest, 'approved')).length;
     }
@@ -346,6 +365,7 @@ function renderResult(result) {
     latestDependabotPullRequests = result.dependabotPullRequests;
     updatePullRequestFilterCounts(latestHumanPullRequests, {
         all: filterCountAll,
+        openedToday: filterCountOpenedToday,
         approved: filterCountApproved,
         pending: filterCountPending,
         changesRequested: filterCountChangesRequested,

@@ -334,7 +334,6 @@ h3 {
 
 .comment-pill {
     padding: 4px 8px;
-    border: 1px solid #8b5cf6;
     border-radius: 999px;
     background: #f3e8ff;
     color: #6d28d9;
@@ -344,7 +343,6 @@ h3 {
 }
 
 :root[data-theme="dark"] .comment-pill {
-    border-color: #a78bfa;
     background: #3b285e;
     color: #ddd6fe;
 }
