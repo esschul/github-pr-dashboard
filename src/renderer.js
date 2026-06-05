@@ -365,7 +365,7 @@ function renderPullRequestList(element, pullRequests, emptyMessage, options = {}
         const ageDetails = options.showAge ? getAgeDetails(pullRequest.createdAt) : null;
         return `
         <article class="pull-request-card">
-            <div>
+            <div class="pull-request-main">
                 <p class="eyebrow">${escapeHtml(pullRequest.repository)}</p>
                 <h3>${escapeHtml(pullRequest.title)}</h3>
                 <p class="pull-request-meta">
@@ -375,14 +375,14 @@ function renderPullRequestList(element, pullRequests, emptyMessage, options = {}
                     <span>·</span>
                     <span>${escapeHtml(options.dateLabel || 'Updated')} ${escapeHtml(formatDate(pullRequest[options.dateField || 'updatedAt']))}</span>
                 </p>
+                <div class="pull-request-badges">
+                    ${pullRequest.hasNewComments ? '<span class="comment-pill">New comments</span>' : ''}
+                    ${ageDetails ? `<span class="age-pill is-${ageDetails.level}">${escapeHtml(ageDetails.label)}</span>` : ''}
+                    <span class="check-pill ${escapeHtml(getCheckStatusClass(pullRequest))}">${escapeHtml(pullRequest.checkStatusLabel || 'No checks')}</span>
+                    <span class="status-pill ${escapeHtml(getReviewStatusClass(pullRequest, options.statusLabel))}">${escapeHtml(options.statusLabel || getReviewLabel(pullRequest))}</span>
+                </div>
             </div>
-            <div class="pull-request-actions">
-                ${pullRequest.hasNewComments ? '<span class="comment-pill">New comments</span>' : ''}
-                ${ageDetails ? `<span class="age-pill is-${ageDetails.level}">${escapeHtml(ageDetails.label)}</span>` : ''}
-                <span class="check-pill ${escapeHtml(getCheckStatusClass(pullRequest))}">${escapeHtml(pullRequest.checkStatusLabel || 'No checks')}</span>
-                <span class="status-pill ${escapeHtml(getReviewStatusClass(pullRequest, options.statusLabel))}">${escapeHtml(options.statusLabel || getReviewLabel(pullRequest))}</span>
-                <button class="secondary-button" type="button" data-pull-request-url="${escapeAttribute(pullRequest.url)}">Open</button>
-            </div>
+            <button class="secondary-button pull-request-open" type="button" data-pull-request-url="${escapeAttribute(pullRequest.url)}">Open</button>
         </article>
     `;
     }).join('');
