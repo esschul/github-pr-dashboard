@@ -439,14 +439,17 @@ h3 {
 
 .filter-bar {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px;
     flex-shrink: 0;
+    overflow-x: auto;
+    padding-bottom: 2px;
 }
 
 .filter-chip {
     display: inline-flex;
     align-items: center;
+    flex-shrink: 0;
     gap: 7px;
     padding: 8px 10px;
     border: 1px solid var(--line);
@@ -512,6 +515,10 @@ h3 {
     padding: 18px;
 }
 
+.pull-request-card > div:first-child {
+    min-width: 0;
+}
+
 .pull-request-card h3 {
     margin-bottom: 8px;
     font-size: 1rem;
@@ -530,7 +537,10 @@ h3 {
 .pull-request-actions {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 9px;
+    min-width: 0;
     flex-shrink: 0;
 }
 
@@ -627,6 +637,17 @@ input {
 
 .hidden {
     display: none;
+}
+
+@media (max-width: 980px) {
+    .pull-request-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pull-request-actions {
+        justify-content: flex-start;
+    }
 }
 
 @media (max-width: 760px) {
